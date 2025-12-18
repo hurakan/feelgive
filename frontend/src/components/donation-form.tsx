@@ -101,18 +101,12 @@ export function DonationForm({ charity, onSubmit, onCancel, isProcessing = false
       setIsRedirecting(true);
       
       try {
-        const donationWindow = openEveryOrgDonation({
+        openEveryOrgDonation({
           slug: charity.slug,
           amount: finalAmount,
           frequency: 'once',
           email: email.trim() || undefined,
         });
-
-        if (!donationWindow) {
-          setError('Pop-up blocked. Please allow pop-ups for this site to complete your donation.');
-          setIsRedirecting(false);
-          return;
-        }
 
         // Give user feedback that they're being redirected
         setTimeout(() => {
@@ -339,7 +333,7 @@ export function DonationForm({ charity, onSubmit, onCancel, isProcessing = false
                 <span>Processing...</span>
               ) : everyOrgEnabled && charityValidation.isValid ? (
                 <span className="flex items-center gap-2">
-                  <span>Donate $${customAmount || amount}</span>
+                  <span>Donate ${customAmount || amount}</span>
                   <ExternalLink className="h-4 w-4" />
                 </span>
               ) : (

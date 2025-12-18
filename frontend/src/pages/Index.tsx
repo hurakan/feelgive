@@ -22,6 +22,7 @@ import { fetchArticleContent, processArticleText } from '@/utils/content-fetcher
 import { ConversationAgent, ConversationContext } from '@/utils/conversation-agent';
 import { useOrganizations } from '@/hooks/use-organizations';
 import { extractSearchTerms } from '@/utils/search-term-extractor';
+import { verifyCharitiesWithBackend } from '@/utils/charity-verification';
 import {
   saveDonation,
   getDonations,
@@ -318,12 +319,17 @@ export default function Index() {
       toast.info('We detected a crisis but don\'t have matching organizations yet');
       return;
     }
+
+    // Verify the matched charities with the backend
+    console.log('🔍 Verifying matched charities with backend...');
+    const verifiedCharities = await verifyCharitiesWithBackend(charities);
+    console.log('✅ Charities verified:', verifiedCharities.map(c => `${c.name} (${c.slug})`));
     
-    setMatchedCharities(charities);
+    setMatchedCharities(verifiedCharities);
     
     const context: ConversationContext = {
       classification: result,
-      matchedCharities: charities,
+      matchedCharities: verifiedCharities,
       articleSummary: summary,
       articleText: text,
       articleTitle: title
@@ -332,7 +338,7 @@ export default function Index() {
     
     setFlowStep('classification');
     
-    toast.success(`Found ${charities.length} ${charities.length === 1 ? 'organization' : 'organizations'} you can support!`);
+    toast.success(`Found ${verifiedCharities.length} ${verifiedCharities.length === 1 ? 'organization' : 'organizations'} you can support!`);
   };
 
   const handleNewsArticleClick = (url: string, title: string) => {
