@@ -107,32 +107,25 @@ export function generateEveryOrgUrl(params: EveryOrgDonationParams): string {
 
   // Get base URL and redirect URL from environment
   const donationBaseUrl = import.meta.env.VITE_DONATION_BASE_URL || 'www.every.org';
-  const redirectUrl = import.meta.env.VITE_REDIRECT_URL || 'http://localhost:5173/donation-success';
+  const redirectUrl = import.meta.env.VITE_REDIRECT_URL || 'http://localhost:5137/donation-success';
 
-  // Build URL with query parameters
-  const url = new URL(`https://${donationBaseUrl}/${slug}`);
+  // Build base URL with slug
+  const baseUrl = `https://${donationBaseUrl}/${slug}`;
   
-  // Set amount (in dollars, not cents)
-  url.searchParams.set('amount', amount.toString());
+  // Build query parameters
+  const queryParams = new URLSearchParams();
+  queryParams.set('amount', amount.toString());
+  queryParams.set('frequency', frequency === 'monthly' ? 'MONTHLY' : 'ONCE');
+  queryParams.set('success_url', redirectUrl);
   
-  // Set frequency (uppercase for Every.org API)
-  url.searchParams.set('frequency', frequency === 'monthly' ? 'MONTHLY' : 'ONCE');
-
-  // Add redirect URL
-  url.searchParams.set('redirect', redirectUrl);
-
   // Add email if provided
   if (email) {
-    url.searchParams.set('email', email);
+    queryParams.set('email', email);
   }
 
-  // Add source tracking
-  url.searchParams.set('source', 'feelgive');
-
-  // Add hash fragment for PayPal confirmation
-  url.hash = '/donate/paypal/confirm';
-
-  return url.toString();
+  // Build final URL with hash fragment and query parameters
+  // Format: https://www.every.org/slug#donate?params
+  return `${baseUrl}#donate?${queryParams.toString()}`;
 }
 
 /**
