@@ -372,7 +372,7 @@ export class StorytellerAgent {
       switch (cause) {
         case 'disaster_relief':
           metrics.push({
-            icon: '🍚',
+            icon: '',
             label: 'Meals Provided',
             value: Math.floor(amount * conversions.meals).toString(),
             description: 'Emergency food for families in crisis',
@@ -380,7 +380,7 @@ export class StorytellerAgent {
           break;
         case 'health_crisis':
           metrics.push({
-            icon: '💉',
+            icon: '',
             label: 'Treatments Delivered',
             value: Math.floor(amount * conversions.treatments).toString(),
             description: 'Life-saving medical care provided',
@@ -388,7 +388,7 @@ export class StorytellerAgent {
           break;
         case 'climate_events':
           metrics.push({
-            icon: '🌳',
+            icon: '',
             label: 'Trees Planted',
             value: Math.floor(amount * conversions.trees).toString(),
             description: 'Restoring ecosystems and fighting climate change',
@@ -396,7 +396,7 @@ export class StorytellerAgent {
           break;
         case 'humanitarian_crisis':
           metrics.push({
-            icon: '🏕️',
+            icon: '',
             label: 'Shelter Days',
             value: Math.floor(amount * conversions.shelterDays).toString(),
             description: 'Safe refuge for displaced families',
@@ -404,7 +404,7 @@ export class StorytellerAgent {
           break;
         case 'social_justice':
           metrics.push({
-            icon: '📚',
+            icon: '',
             label: 'Students Supported',
             value: Math.floor(amount * conversions.students).toString(),
             description: 'Education access for marginalized youth',
@@ -420,7 +420,7 @@ export class StorytellerAgent {
     }, 0);
 
     metrics.push({
-      icon: '👨‍👩‍👧‍👦',
+      icon: '',
       label: 'Families Helped',
       value: Math.floor(totalFamilies).toString(),
       description: 'Lives touched by your generosity',
@@ -462,15 +462,15 @@ export class StorytellerAgent {
   private static generateAchievements(donations: Donation[], totalAmount: number): string[] {
     const achievements: string[] = [];
 
-    if (donations.length >= 1) achievements.push("🎉 First Donation");
-    if (donations.length >= 5) achievements.push("⭐ 5 Donations Milestone");
-    if (donations.length >= 10) achievements.push("🏆 10 Donations Champion");
-    if (totalAmount >= 50) achievements.push("💎 $50+ Impact Maker");
-    if (totalAmount >= 100) achievements.push("👑 $100+ Generosity Leader");
+    if (donations.length >= 1) achievements.push("First Donation");
+    if (donations.length >= 5) achievements.push("5 Donations Milestone");
+    if (donations.length >= 10) achievements.push("10 Donations Champion");
+    if (totalAmount >= 50) achievements.push("$50+ Impact Maker");
+    if (totalAmount >= 100) achievements.push("$100+ Generosity Leader");
     
     const causes = new Set(donations.map(d => d.cause));
-    if (causes.size >= 3) achievements.push("🌍 Multi-Cause Supporter");
-    if (causes.size === 5) achievements.push("🎯 All Causes Champion");
+    if (causes.size >= 3) achievements.push("Multi-Cause Supporter");
+    if (causes.size === 5) achievements.push("All Causes Champion");
 
     return achievements;
   }

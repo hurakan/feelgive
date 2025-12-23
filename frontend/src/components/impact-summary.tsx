@@ -52,7 +52,7 @@ export function ImpactSummary({
             onClick={() => setShowMonthlyReport(false)}
             className="gap-2"
           >
-            ← Back to Summary
+            Back to Summary
           </Button>
         </div>
         <MonthlyReportCard 
@@ -122,7 +122,7 @@ export function ImpactSummary({
                 </p>
               </div>
               <Button variant="ghost" size="sm">
-                View Report →
+                View Report
               </Button>
             </div>
           </CardContent>

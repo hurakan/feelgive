@@ -184,7 +184,7 @@ export function UncertainClassification({
             <ul className="space-y-2">
               {suggestions.map((suggestion, index) => (
                 <li key={index} className="flex items-start gap-2 text-sm text-foreground/70">
-                  <span className="text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0">✓</span>
+                  <span className="text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0">•</span>
                   <span>{suggestion}</span>
                 </li>
               ))}

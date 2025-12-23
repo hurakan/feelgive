@@ -165,8 +165,8 @@ export function MonthlyReportCard({ report, onTakeAction }: MonthlyReportCardPro
       {/* Footer Message */}
       <div className="text-center p-6 rounded-lg bg-gradient-to-r from-primary/5 to-blue-500/5 border-2 border-primary/20">
         <p className="text-base font-medium text-foreground/80">
-          Thank you for being part of the FeelGive community. 
-          Your generosity is creating real, measurable change in the world. 💙
+          Thank you for being part of the FeelGive community.
+          Your generosity is creating real, measurable change in the world.
         </p>
       </div>
     </div>

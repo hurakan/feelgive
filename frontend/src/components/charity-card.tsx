@@ -126,7 +126,7 @@ export function CharityCard({ charity, onDonate, featured = false, isSelected = 
             variant={isSelected || featured ? 'default' : 'outline'}
             aria-label={isSelected ? `Selected: ${charity.name}. Click to change selection` : `Select ${charity.name}`}
           >
-            {isSelected ? 'Selected ✓' : 'Select This Organization'}
+            {isSelected ? 'Selected' : 'Select This Organization'}
           </Button>
         </CardContent>
       </Card>

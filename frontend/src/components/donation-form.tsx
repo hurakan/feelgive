@@ -326,7 +326,6 @@ export function DonationForm({ charity, onSubmit, onCancel, isProcessing = false
             >
               {isRedirecting ? (
                 <span className="flex items-center gap-2">
-                  <span className="animate-spin">⏳</span>
                   <span>Redirecting to Every.org...</span>
                 </span>
               ) : isProcessing ? (

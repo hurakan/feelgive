@@ -164,19 +164,19 @@ export class ConversationAgent {
   private getFallbackMessage(error: string): string {
     // Provide context-aware fallback messages based on error type
     if (error.includes('Too many requests') || error.includes('rate limit') || error.includes('quota')) {
-      return "⏳ **Rate Limit Reached**\n\nI've reached my daily question limit. Please wait about 30 seconds and try again, or proceed directly to donation.\n\nThe organizations we've matched are verified and ready to help with this crisis.";
+      return "**Rate Limit Reached**\n\nI've reached my daily question limit. Please wait about 30 seconds and try again, or proceed directly to donation.\n\nThe organizations we've matched are verified and ready to help with this crisis.";
     }
     
     if (error.includes('temporarily unavailable') || error.includes('high demand')) {
-      return "⏳ **Service Temporarily Busy**\n\nI'm experiencing high demand right now. Please wait a moment (about 30 seconds) and try your question again.\n\nIn the meantime, the organizations we've matched specialize in this type of crisis and are ready to help. Would you like to proceed with a donation?";
+      return "**Service Temporarily Busy**\n\nI'm experiencing high demand right now. Please wait a moment (about 30 seconds) and try your question again.\n\nIn the meantime, the organizations we've matched specialize in this type of crisis and are ready to help. Would you like to proceed with a donation?";
     }
     
     if (error.includes('connect')) {
-      return "🔌 **Connection Issue**\n\nI'm having trouble connecting right now. However, the organizations we've matched are vetted and ready to help.\n\nWould you like to learn more about them or proceed with a donation?";
+      return "**Connection Issue**\n\nI'm having trouble connecting right now. However, the organizations we've matched are vetted and ready to help.\n\nWould you like to learn more about them or proceed with a donation?";
     }
     
     // Generic fallback
-    return "⚠️ **Temporary Issue**\n\nI'm having a brief issue, but I'm here to help. The organizations we've matched are trusted and ready to assist with this crisis.\n\nWhat would you like to know?";
+    return "**Temporary Issue**\n\nI'm having a brief issue, but I'm here to help. The organizations we've matched are trusted and ready to assist with this crisis.\n\nWhat would you like to know?";
   }
 
   private generateId(): string {

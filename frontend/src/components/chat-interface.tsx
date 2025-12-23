@@ -223,7 +223,7 @@ export function ChatInterface({ agent, onProceedToDonation, onBack, articleTitle
           onClick={onBack}
           className="gap-2"
         >
-          ← Back
+          Back
         </Button>
         <Button
           onClick={onProceedToDonation}
