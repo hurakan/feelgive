@@ -169,13 +169,19 @@ export function ClassificationReasoning({ classification, matchedCharities }: Cl
                   <li className="flex items-start gap-2">
                     <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
                     <span>
-                      <strong className="text-foreground">Trust score (PRIMARY):</strong> Organizations are ranked by trust score first. Average trust score of {avgTrustScore}%
+                      <strong className="text-foreground">Geographic proximity (PRIMARY):</strong> Organizations operating directly in {classification.geoName} are ranked first, followed by regional and global responders
                     </span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
                     <span>
-                      <strong className="text-foreground">Cause alignment:</strong> All specialize in {getCauseLabel(classification.cause).toLowerCase()}
+                      <strong className="text-foreground">Cause alignment (SECONDARY):</strong> All specialize in {getCauseLabel(classification.cause).toLowerCase()} or related expertise
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
+                    <span>
+                      <strong className="text-foreground">Trust score (TIEBREAKER):</strong> Average trust score of {avgTrustScore}% (transparency, financial health, impact effectiveness)
                     </span>
                   </li>
                   <li className="flex items-start gap-2">
@@ -184,12 +190,6 @@ export function ClassificationReasoning({ classification, matchedCharities }: Cl
                       <strong className="text-foreground">Vetting quality:</strong> {hasDirectVetting && 'Includes directly vetted organizations'}
                       {!hasDirectVetting && hasPartnerReview && 'All partner-reviewed organizations'}
                       {!hasDirectVetting && !hasPartnerReview && 'All partner-vetted organizations'}
-                    </span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
-                    <span>
-                      <strong className="text-foreground">Geographic reach:</strong> Active in {classification.geoName} or globally
                     </span>
                   </li>
                 </ul>
@@ -204,9 +204,10 @@ export function ClassificationReasoning({ classification, matchedCharities }: Cl
               </div>
               <div className="pl-6">
                 <p className="text-sm leading-relaxed text-foreground/70">
-                  Organizations are ranked <strong className="text-foreground">primarily by trust score</strong> (transparency, financial health, impact effectiveness). 
-                  When trust scores are equal, we use geographic relevance and needs matching as tiebreakers. 
-                  The top match has the highest trust score for this specific cause.
+                  Organizations are ranked using a <strong className="text-foreground">hierarchical tiered system</strong>:
+                  (1) Geographic proximity to the crisis is the primary factor, ensuring local organizations are prioritized.
+                  (2) Cause alignment and specific needs matching is secondary.
+                  (3) Trust score serves as the final tiebreaker when organizations are equally relevant geographically and by cause.
                 </p>
               </div>
             </div>

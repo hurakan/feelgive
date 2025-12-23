@@ -1,162 +1,263 @@
-import { Charity, Classification, IdentifiedNeed } from '@/types';
+import { Charity, Classification, IdentifiedNeed, RankedCharity, CauseCategory } from '@/types';
 import { VERIFIED_CHARITIES } from '@/data/charities-verified';
+import { areNeighboringCountries, areInSameRegion } from './geographic-regions';
 
-interface CharityScore {
-  charity: Charity;
-  totalScore: number;
-  causeScore: number;
-  geoScore: number;
-  needsScore: number;
-  trustScore: number;
-  breakdown: string[];
+/**
+ * Adjacent cause mapping for Tier 3 (Related Match)
+ * Maps primary causes to related/adjacent causes
+ */
+const ADJACENT_CAUSES: Record<CauseCategory, CauseCategory[]> = {
+  disaster_relief: ['humanitarian_crisis', 'climate_events'],
+  humanitarian_crisis: ['disaster_relief', 'social_justice'],
+  health_crisis: ['humanitarian_crisis'],
+  climate_events: ['disaster_relief'],
+  social_justice: ['humanitarian_crisis'],
+};
+
+/**
+ * Calculate geographic tier for an organization
+ * Tier 1: Direct country or city match
+ * Tier 2: Neighboring country or same region
+ * Tier 3: Global with high flexibility (geographicFlexibility >= 7)
+ * Tier 4: Global with low flexibility (geographicFlexibility < 7)
+ * Tier 5: No match (filtered out)
+ */
+function calculateGeographicTier(
+  charity: Charity,
+  classification: Classification
+): { tier: number; reason: string } {
+  const { geo, geoName } = classification;
+  const charityCountries = charity.countries.map(c => c.toUpperCase());
+  const crisisCountry = geo.toUpperCase();
+  
+  // Tier 1: Direct country match or city match
+  if (charityCountries.includes(crisisCountry)) {
+    return {
+      tier: 1,
+      reason: `Operates directly in ${geoName}`
+    };
+  }
+  
+  // Check if geoName might be a city - if so, still consider it direct if country matches
+  if (geoName && geoName !== geo) {
+    const geoNameUpper = geoName.toUpperCase();
+    if (charityCountries.includes(geoNameUpper)) {
+      return {
+        tier: 1,
+        reason: `Operates directly in ${geoName}`
+      };
+    }
+  }
+  
+  // Tier 2: Neighboring country or same region
+  for (const charityCountry of charityCountries) {
+    if (charityCountry === 'GLOBAL') continue;
+    
+    // Check if neighboring country
+    if (areNeighboringCountries(crisisCountry, charityCountry)) {
+      return {
+        tier: 2,
+        reason: `Operates in neighboring country (${charityCountry})`
+      };
+    }
+    
+    // Check if same region
+    if (areInSameRegion(crisisCountry, charityCountry)) {
+      return {
+        tier: 2,
+        reason: `Operates in the same region`
+      };
+    }
+  }
+  
+  // Tier 3 & 4: Global organizations
+  if (charityCountries.includes('GLOBAL')) {
+    // Tier 3: High flexibility (can deploy rapidly anywhere)
+    if (charity.geographicFlexibility >= 7) {
+      return {
+        tier: 3,
+        reason: `Global responder with rapid deployment capability`
+      };
+    }
+    
+    // Tier 4: Lower flexibility (slower deployment or partner-based)
+    return {
+      tier: 4,
+      reason: `Global organization with partner network`
+    };
+  }
+  
+  // Tier 5: No geographic match
+  return {
+    tier: 5,
+    reason: `Does not operate in this region`
+  };
 }
 
 /**
- * Match charities based on classification
- * @param classification - The classification result
- * @param availableCharities - Optional list of charities to match from (defaults to verified charities)
+ * Calculate cause match level for an organization
+ * Level 1: Perfect match (cause + specific need)
+ * Level 2: Category match (cause only)
+ * Level 3: Related/adjacent match
+ * Level 4: No match (filtered out)
  */
-export function matchCharities(
-  classification: Classification,
-  availableCharities: Charity[] = VERIFIED_CHARITIES
-): Charity[] {
-  const { cause, geo, geoName, identified_needs } = classification;
+function calculateCauseMatchLevel(
+  charity: Charity,
+  classification: Classification
+): { level: number; reason: string } {
+  const { cause, identified_needs } = classification;
   
-  console.log('🎯 matchCharities called with:');
-  console.log(`   - availableCharities.length: ${availableCharities.length}`);
-  console.log(`   - Using default VERIFIED_CHARITIES? ${availableCharities === VERIFIED_CHARITIES ? 'YES' : 'NO'}`);
-  console.log(`   - cause: ${cause}`);
+  // Check if primary cause matches
+  const hasPrimaryCauseMatch = charity.causes.includes(cause);
   
-  // Filter charities by cause
-  let matches = availableCharities.filter(charity =>
-    charity.isActive && charity.causes.includes(cause)
-  );
-  
-  console.log(`   - Matches after cause filter: ${matches.length}`);
-
-  if (matches.length === 0) {
-    return [];
-  }
-
-  // Score each charity
-  const scoredCharities: CharityScore[] = matches.map(charity => {
-    const breakdown: string[] = [];
-    let totalScore = 0;
-
-    // 1. Cause alignment (base score: 10 points)
-    const causeScore = 10;
-    totalScore += causeScore;
-    breakdown.push(`Cause match: ${causeScore}`);
-
-    // 2. Geographic relevance (0-15 points)
-    let geoScore = 0;
-    
-    // Direct country match
-    if (charity.countries.includes(geo) || charity.countries.includes(geoName.toLowerCase())) {
-      geoScore += 10;
-      breakdown.push(`Direct geographic match: +10`);
-    }
-    // Global reach
-    else if (charity.countries.includes('global')) {
-      geoScore += charity.geographicFlexibility * 1.5; // 1.5-7.5 points based on flexibility
-      breakdown.push(`Global reach (flexibility ${charity.geographicFlexibility}): +${(charity.geographicFlexibility * 1.5).toFixed(1)}`);
-    }
-    // Regional proximity (partial match)
-    else {
-      const hasRegionalMatch = charity.countries.some(country => {
-        // Check if any country is in the same region
-        const regionMatches = [
-          ['US', 'CA', 'MX'].includes(country) && ['US', 'CA', 'MX'].includes(geo),
-          ['AF', 'AS', 'SA'].some(r => country.includes(r)) && ['AF', 'AS', 'SA'].some(r => geo.includes(r)),
-        ];
-        return regionMatches.some(Boolean);
-      });
-      
-      if (hasRegionalMatch) {
-        geoScore += 5;
-        breakdown.push(`Regional proximity: +5`);
-      }
-    }
-    
-    totalScore += geoScore;
-
-    // 3. Needs-based matching (0-20 points)
-    let needsScore = 0;
-    
+  if (hasPrimaryCauseMatch) {
+    // Level 1: Perfect match - cause + specific needs
     if (identified_needs.length > 0) {
-      const matchedNeeds = identified_needs.filter(need => 
+      const matchedNeeds = identified_needs.filter(need =>
         charity.addressedNeeds.includes(need)
       );
       
       if (matchedNeeds.length > 0) {
-        // Award points based on percentage of needs matched
-        const needsMatchPercentage = matchedNeeds.length / identified_needs.length;
-        needsScore = needsMatchPercentage * 20;
-        breakdown.push(`Needs match (${matchedNeeds.length}/${identified_needs.length}): +${needsScore.toFixed(1)}`);
+        const needsList = matchedNeeds
+          .map(n => n.replace(/_/g, ' '))
+          .join(', ');
+        return {
+          level: 1,
+          reason: `Directly addresses ${needsList} needs`
+        };
       }
-    } else {
-      // If no specific needs identified, give partial credit
-      needsScore = 5;
-      breakdown.push(`General capability: +5`);
     }
     
-    totalScore += needsScore;
-
-    // 4. Trust score (0-10 points, normalized)
-    const trustScore = (charity.trustScore / 100) * 10;
-    totalScore += trustScore;
-    breakdown.push(`Trust score (${charity.trustScore}%): +${trustScore.toFixed(1)}`);
-
-    // 5. Vetting level bonus (0-5 points)
-    const vettingBonus = {
-      'pg_direct': 5,
-      'partner_pg_review': 3,
-      'partner_only': 1,
-    }[charity.vettingLevel];
-    
-    totalScore += vettingBonus;
-    breakdown.push(`Vetting level: +${vettingBonus}`);
-
+    // Level 2: Category match only
     return {
-      charity,
-      totalScore,
-      causeScore,
-      geoScore,
-      needsScore,
-      trustScore,
-      breakdown
+      level: 2,
+      reason: `Specializes in ${cause.replace(/_/g, ' ')}`
     };
-  });
-
-  // Sort by TOTAL COMPOSITE SCORE (relevance + trust combined)
-  // This ensures variety and context-appropriate recommendations
-  scoredCharities.sort((a, b) => {
-    return b.totalScore - a.totalScore;
-  });
-
-  // Log top 3 for debugging (in production, this would go to analytics)
-  if (process.env.NODE_ENV === 'development') {
-    console.log('🎯 Charity Matching Results (sorted by composite relevance):');
-    scoredCharities.slice(0, 3).forEach((scored, index) => {
-      console.log(`\n${index + 1}. ${scored.charity.name}`);
-      console.log(`   Composite Score: ${scored.totalScore.toFixed(1)}`);
-      console.log(`   Trust Score: ${scored.charity.trustScore}%`);
-      scored.breakdown.forEach(line => console.log(`   - ${line}`));
-    });
   }
-
-  // Return top 3 matches
-  return scoredCharities.slice(0, 3).map(s => s.charity);
+  
+  // Level 3: Adjacent/related cause
+  const adjacentCauses = ADJACENT_CAUSES[cause] || [];
+  const hasAdjacentMatch = charity.causes.some(c => adjacentCauses.includes(c));
+  
+  if (hasAdjacentMatch) {
+    const matchedCause = charity.causes.find(c => adjacentCauses.includes(c));
+    return {
+      level: 3,
+      reason: `Related expertise in ${matchedCause?.replace(/_/g, ' ')}`
+    };
+  }
+  
+  // Level 4: No match
+  return {
+    level: 4,
+    reason: `Does not match crisis type`
+  };
 }
 
+/**
+ * Match charities using the new hierarchical tiered ranking algorithm
+ * Returns ranked charities with explainability metadata
+ * 
+ * @param classification - The classification result
+ * @param availableCharities - Optional list of charities to match from (defaults to verified charities)
+ * @returns Array of RankedCharity objects sorted by relevance
+ */
+export function matchCharities(
+  classification: Classification,
+  availableCharities: Charity[] = VERIFIED_CHARITIES
+): RankedCharity[] {
+  const { cause, geo, geoName, identified_needs } = classification;
+  
+  console.log('🎯 New Tiered Ranking Algorithm:');
+  console.log(`   - Crisis: ${cause} in ${geoName} (${geo})`);
+  console.log(`   - Needs: ${identified_needs.join(', ')}`);
+  console.log(`   - Available charities: ${availableCharities.length}`);
+  
+  // Filter active charities only
+  const activeCharities = availableCharities.filter(charity => charity.isActive);
+  
+  // Calculate tiers for each charity
+  const rankedCharities: RankedCharity[] = activeCharities.map(charity => {
+    // Calculate geographic tier
+    const geoResult = calculateGeographicTier(charity, classification);
+    
+    // Calculate cause match level
+    const causeResult = calculateCauseMatchLevel(charity, classification);
+    
+    // Calculate composite score for debugging (lower is better)
+    // Primary: geo tier, Secondary: cause level, Tertiary: trust score (inverted)
+    const final_rank_score = 
+      (geoResult.tier * 1000) + 
+      (causeResult.level * 100) + 
+      (100 - charity.trustScore);
+    
+    return {
+      ...charity,
+      geographic_tier: geoResult.tier,
+      cause_match_level: causeResult.level,
+      proximity_reason: geoResult.reason,
+      cause_match_reason: causeResult.reason,
+      final_rank_score
+    };
+  });
+  
+  // Filter out complete mismatches (Tier 5 geo or Level 4 cause)
+  const validMatches = rankedCharities.filter(
+    rc => rc.geographic_tier <= 4 && rc.cause_match_level <= 3
+  );
+  
+  // Sort by hierarchical criteria:
+  // 1. Geographic tier (ascending - lower is better)
+  // 2. Cause match level (ascending - lower is better)
+  // 3. Trust score (descending - higher is better)
+  validMatches.sort((a, b) => {
+    // Primary: Geographic tier
+    if (a.geographic_tier !== b.geographic_tier) {
+      return a.geographic_tier - b.geographic_tier;
+    }
+    
+    // Secondary: Cause match level
+    if (a.cause_match_level !== b.cause_match_level) {
+      return a.cause_match_level - b.cause_match_level;
+    }
+    
+    // Tertiary: Trust score (descending)
+    return b.trustScore - a.trustScore;
+  });
+  
+  // Log top 3 for debugging
+  if (process.env.NODE_ENV === 'development') {
+    console.log('\n🏆 Top Ranked Organizations:');
+    validMatches.slice(0, 3).forEach((ranked, index) => {
+      console.log(`\n${index + 1}. ${ranked.name}`);
+      console.log(`   Geographic Tier: ${ranked.geographic_tier} - ${ranked.proximity_reason}`);
+      console.log(`   Cause Level: ${ranked.cause_match_level} - ${ranked.cause_match_reason}`);
+      console.log(`   Trust Score: ${ranked.trustScore}%`);
+      console.log(`   Final Rank Score: ${ranked.final_rank_score}`);
+    });
+  }
+  
+  // Return top 3 matches
+  return validMatches.slice(0, 3);
+}
+
+/**
+ * Get charity by ID
+ */
 export function getCharityById(id: string, charities: Charity[] = VERIFIED_CHARITIES): Charity | undefined {
   return charities.find(c => c.id === id);
 }
 
+/**
+ * Get charity by slug
+ */
 export function getCharityBySlug(slug: string, charities: Charity[] = VERIFIED_CHARITIES): Charity | undefined {
   return charities.find(c => c.slug === slug);
 }
 
+/**
+ * Get vetting level label
+ */
 export function getVettingLevelLabel(level: Charity['vettingLevel']): string {
   const labels = {
     'pg_direct': 'Directly Vetted',
@@ -166,14 +267,45 @@ export function getVettingLevelLabel(level: Charity['vettingLevel']): string {
   return labels[level];
 }
 
-// Get explanation for why a charity was recommended
+/**
+ * Get recommendation reasoning for a ranked charity
+ * Uses the explainability metadata from the ranking algorithm
+ */
 export function getRecommendationReasoning(
-  charity: Charity, 
+  charity: Charity | RankedCharity,
   classification: Classification
 ): string {
+  // Check if this is a RankedCharity with explainability data
+  if ('proximity_reason' in charity && 'cause_match_reason' in charity) {
+    const ranked = charity as RankedCharity;
+    
+    const reasons: string[] = [];
+    
+    // Add geographic reasoning
+    reasons.push(ranked.proximity_reason.toLowerCase());
+    
+    // Add cause reasoning
+    reasons.push(ranked.cause_match_reason.toLowerCase());
+    
+    // Add trust score if exceptional
+    if (ranked.trustScore >= 95) {
+      reasons.push(`has exceptional trust score (${ranked.trustScore}%)`);
+    } else if (ranked.trustScore >= 90) {
+      reasons.push(`has high trust score (${ranked.trustScore}%)`);
+    }
+    
+    // Add vetting level if directly vetted
+    if (ranked.vettingLevel === 'pg_direct') {
+      reasons.push('is directly vetted by FeelGive');
+    }
+    
+    return `Recommended because this organization ${reasons.join(', ')}.`;
+  }
+  
+  // Fallback for non-ranked charities (backward compatibility)
   const reasons: string[] = [];
 
-  // Trust score (now primary factor)
+  // Trust score
   if (charity.trustScore >= 95) {
     reasons.push(`has exceptional trust score (${charity.trustScore}%)`);
   } else if (charity.trustScore >= 90) {
@@ -194,7 +326,7 @@ export function getRecommendationReasoning(
       charity.addressedNeeds.includes(need)
     );
     if (matchedNeeds.length > 0) {
-      const needsList = matchedNeeds.map(n => n.replace('_', ' ')).join(', ');
+      const needsList = matchedNeeds.map(n => n.replace(/_/g, ' ')).join(', ');
       reasons.push(`directly addresses identified needs: ${needsList}`);
     }
   }

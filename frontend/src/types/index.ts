@@ -122,6 +122,17 @@ export interface Charity {
   geographicFlexibility: number;
   addressedNeeds: IdentifiedNeed[];
   everyOrgVerified?: boolean; // Whether the Every.org slug has been manually verified
+  geographic_tier?: number; // 1-4: Geographic relevance tier for explainability
+  cause_match_level?: number; // 1-3: Cause match level for explainability
+}
+
+// Extended charity interface with ranking metadata for explainability
+export interface RankedCharity extends Charity {
+  proximity_reason: string; // Human-readable explanation of geographic relevance
+  cause_match_reason: string; // Human-readable explanation of cause match
+  geographic_tier: number; // 1-4: Direct/Regional/Global-High/Global-Low
+  cause_match_level: number; // 1-3: Perfect/Category/Related
+  final_rank_score: number; // Composite score for debugging
 }
 
 export interface Classification {

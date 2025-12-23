@@ -15,7 +15,7 @@ import { SettingsModal } from '@/components/settings-modal';
 import { NewsFeed } from '@/components/news-feed';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Classification, Charity, DonationFormData, Donation } from '@/types';
+import { Classification, Charity, RankedCharity, DonationFormData, Donation } from '@/types';
 import { classifyContent } from '@/utils/classification';
 import { matchCharities } from '@/utils/charity-matching';
 import { fetchArticleContent, processArticleText } from '@/utils/content-fetcher';
@@ -50,7 +50,7 @@ export default function Index() {
   const [newsKey, setNewsKey] = useState(0);
   
   const [classification, setClassification] = useState<Classification | null>(null);
-  const [matchedCharities, setMatchedCharities] = useState<Charity[]>([]);
+  const [matchedCharities, setMatchedCharities] = useState<RankedCharity[]>([]);
   const [conversationAgent, setConversationAgent] = useState<ConversationAgent | null>(null);
   const [selectedCharity, setSelectedCharity] = useState<Charity | null>(null);
   const [completedDonation, setCompletedDonation] = useState<Donation | null>(null);
