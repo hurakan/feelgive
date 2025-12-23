@@ -50,13 +50,15 @@ export type IdentifiedNeed =
   | 'winterization'
   | 'sanitation';
 
-export type LocationType = 'region' | 'country' | 'postal_code';
+export type LocationType = 'region' | 'country' | 'city';
 
 export interface TrackedLocation {
   id: string;
   type: LocationType;
   value: string;
   displayName: string;
+  state?: string; // For city type - required for US cities
+  country?: string; // For city type - required
   coordinates?: {
     lat: number;
     lng: number;
@@ -217,6 +219,7 @@ export interface ChatContext {
   articleTitle: string;
   articleText: string;
   articleSummary: string;
+  articleUrl?: string;
   classification: {
     cause: string;
     geoName: string;

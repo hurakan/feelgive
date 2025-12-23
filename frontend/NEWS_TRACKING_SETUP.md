@@ -6,8 +6,8 @@ Users can now track news from specific locations and get personalized article re
 
 ### Features Added:
 1. **Settings Modal** - Manage tracked locations
-2. **Location Types** - Track by region, country, or postal code
-3. **Country Selection for Postal Codes** - Disambiguate postal codes by country
+2. **Location Types** - Track by region, country, or city
+3. **State and Country Selection for Cities** - Precise city identification with state/province support
 4. **News Feed** - Personalized articles from tracked locations
 5. **Direct Analysis** - Click any news article to start donation flow
 6. **Auto-refresh** - News updates when app opens
@@ -57,8 +57,8 @@ npm run dev
    - Click the gear icon (⚙️) in the top right
 
 2. **Add Locations**
-   - Choose type: Region, Country, or Postal Code
-   - **For Postal Codes:** Select country first, then enter code
+   - Choose type: Region, Country, or City
+   - **For Cities:** Select country first, then state (if applicable), then enter city name
    - Click "Add Location"
    - Repeat for multiple locations
 
@@ -83,81 +83,65 @@ npm run dev
 - United States, Sudan, Mexico, Cambodia, etc.
 - Shows news FROM and ABOUT the country
 
-**Postal Codes:**
-- **NEW:** Select country first to avoid ambiguity
+**Cities:**
+- **NEW:** Select country and state (if applicable) for precise identification
 - Examples:
-  - **United States:** 90210, 10001
-  - **Canada:** M5H 2N2
-  - **United Kingdom:** SW1A 1AA
-  - **Australia:** 2000
-  - **Germany:** 10115
-  - **France:** 75001
-- Searches within 200-mile radius
-- Supports 30+ countries
+  - **United States:** Los Angeles, California
+  - **Canada:** Toronto, Ontario
+  - **United Kingdom:** London
+  - **Australia:** Sydney, New South Wales
+  - **India:** Mumbai, Maharashtra
+  - **Brazil:** São Paulo
+- Searches within 100-mile radius
+- Supports cities worldwide with state/province selection for US, Canada, Australia, India, Brazil, and Mexico
 
 ---
 
-## 🌍 Supported Postal Code Countries
+## 🌍 Supported Countries with State/Province Selection
 
-- 🇺🇸 United States
-- 🇨🇦 Canada
-- 🇬🇧 United Kingdom
-- 🇦🇺 Australia
-- 🇩🇪 Germany
-- 🇫🇷 France
-- 🇮🇹 Italy
-- 🇪🇸 Spain
-- 🇳🇱 Netherlands
-- 🇧🇪 Belgium
-- 🇨🇭 Switzerland
-- 🇦🇹 Austria
-- 🇸🇪 Sweden
-- 🇳🇴 Norway
-- 🇩🇰 Denmark
-- 🇫🇮 Finland
-- 🇵🇱 Poland
-- 🇨🇿 Czech Republic
-- 🇵🇹 Portugal
-- 🇮🇪 Ireland
-- 🇳🇿 New Zealand
-- 🇯🇵 Japan
-- 🇰🇷 South Korea
-- 🇸🇬 Singapore
-- 🇮🇳 India
-- 🇧🇷 Brazil
-- 🇲🇽 Mexico
-- 🇦🇷 Argentina
-- 🇿🇦 South Africa
+### Countries with State Selection:
+- 🇺🇸 **United States** - All 50 states
+- 🇨🇦 **Canada** - Provinces and territories
+- 🇦🇺 **Australia** - States and territories
+- 🇮🇳 **India** - States and union territories
+- 🇧🇷 **Brazil** - States
+- 🇲🇽 **Mexico** - States
+
+### All Countries Supported for City Tracking:
+Cities from any country can be tracked. State/province selection is required for the countries listed above to ensure precise location identification.
 
 ---
 
 ## 🎨 UI Changes
 
-### Postal Code Input (NEW):
+### City Input (NEW):
 
 ```
 ┌─────────────────────────────┐
-│ Location Type: Postal Code  │
+│ Location Type: City          │
 │                              │
 │ Country: [United States ▼]  │
 │                              │
-│ Postal/Zip Code:             │
-│ [90210____________]          │
-│ Format: 5 digits (e.g., 90210)
+│ State/Province: [California ▼]│
+│                              │
+│ City Name:                   │
+│ [Los Angeles_______]         │
+│ State selection is required. │
 │                              │
 │ [Add Location]               │
 └─────────────────────────────┘
 ```
 
-### Before (Ambiguous):
-- User enters "2000"
-- Could be Sydney, Australia OR Switzerland
+### Why State Selection Matters:
+
+**Before (Ambiguous):**
+- User enters "Springfield"
+- Could be Springfield, IL OR Springfield, MA OR 30+ other Springfields
 - ❌ Wrong location might be selected
 
-### After (Clear):
-- User selects "Australia" from dropdown
-- Then enters "2000"
-- ✅ Correctly identifies Sydney, Australia
+**After (Precise):**
+- User selects "United States" → "Illinois" → "Springfield"
+- ✅ Correctly identifies Springfield, Illinois
 
 ---
 
@@ -165,11 +149,11 @@ npm run dev
 
 ### New Files Created:
 
-1. **`src/types/index.ts`** - Added `TrackedLocation` and `NewsArticle` types
-2. **`src/utils/tracked-locations.ts`** - Location management
-3. **`src/utils/geocoding.ts`** - Postal code → coordinates with country parameter
-4. **`src/utils/news-api.ts`** - NewsAPI integration
-5. **`src/components/settings-modal.tsx`** - Settings UI with country selector
+1. **`src/types/index.ts`** - Added `TrackedLocation` with state/country fields and `NewsArticle` types
+2. **`src/utils/tracked-locations.ts`** - Location management with US states list
+3. **`src/utils/geocoding.ts`** - City → coordinates with state and country parameters
+4. **`src/utils/news-api.ts`** - NewsAPI integration with 100-mile radius
+5. **`src/components/settings-modal.tsx`** - Settings UI with country and state selectors
 6. **`src/components/news-feed.tsx`** - News display
 7. **`.env.example`** - Environment variable template
 
@@ -193,24 +177,26 @@ npm run dev
   },
   {
     id: "loc_1234567891_def456",
-    type: "postal_code",
-    value: "90210-US", // Stored with country code
-    displayName: "90210 (Beverly Hills, CA, USA)",
-    coordinates: { lat: 34.0901, lng: -118.4065 },
+    type: "city",
+    value: "Los Angeles",
+    state: "California",
+    country: "US",
+    displayName: "Los Angeles, California, United States",
+    coordinates: { lat: 34.0522, lng: -118.2437 },
     createdAt: 1234567891000
   }
 ]
 ```
 
-### Geocoding with Country:
+### Geocoding with State and Country:
 
 ```typescript
-// Old (ambiguous)
-geocodePostalCode("2000")
+// Without state (less precise)
+geocodeCity("Springfield", undefined, "US")
 
-// New (precise)
-geocodePostalCode("2000", "AU") // Australia
-geocodePostalCode("2000", "CH") // Switzerland
+// With state (precise)
+geocodeCity("Springfield", "Illinois", "US")
+geocodeCity("Springfield", "Massachusetts", "US")
 ```
 
 ### API Caching:
@@ -233,15 +219,15 @@ geocodePostalCode("2000", "CH") // Switzerland
 ### Geocoding:
 - Uses free OpenStreetMap Nominatim
 - Rate limited (1 request/second)
-- May not find all postal codes
+- May not find all cities
 - Requires internet connection
-- **NEW:** Country parameter improves accuracy
+- **NEW:** State and country parameters ensure precise identification
 
-### Postal Code Formats:
-- Vary significantly by country
-- Some countries have complex formats
-- Validation is lenient (3-10 characters)
-- Format hints shown for each country
+### City Names:
+- Common city names may exist in multiple locations
+- State selection required for US, Canada, Australia, India, Brazil, and Mexico
+- Validation is lenient (2-100 characters)
+- 100-mile radius for news search
 
 ### Production Considerations:
 - Need paid NewsAPI plan for production
@@ -254,23 +240,23 @@ geocodePostalCode("2000", "CH") // Switzerland
 
 ## 🐛 Troubleshooting
 
-### "Could not find postal code"
-- **Cause:** Invalid format or code doesn't exist in selected country
-- **Solution:** 
-  - Check you selected the correct country
-  - Verify postal code format for that country
-  - Try a different postal code
+### "Could not find city"
+- **Cause:** City name doesn't exist in selected state/country
+- **Solution:**
+  - Check you selected the correct country and state
+  - Verify city name spelling
+  - Try a larger nearby city
 
 ### "No recent news found"
 - **Cause:** NewsAPI returned no results
 - **Solution:** Try different location or check API key
 
 ### "Failed to add location"
-- **Cause:** Geocoding failed for postal code
-- **Solution:** 
-  - Verify country selection is correct
-  - Check postal code format
-  - Try a major city's postal code first
+- **Cause:** Geocoding failed for city
+- **Solution:**
+  - Verify country and state selection is correct
+  - Check city name spelling
+  - Try a major city first
 
 ### "Failed to load news"
 - **Cause:** API key invalid or rate limit exceeded
@@ -280,12 +266,12 @@ geocodePostalCode("2000", "CH") // Switzerland
 - **Cause:** Cache still valid (30 min)
 - **Solution:** Click manual refresh button
 
-### Wrong location for postal code
-- **Cause:** Country not selected or wrong country
-- **Solution:** 
-  - Always select country first
-  - Double-check country matches postal code
-  - Remove and re-add with correct country
+### Wrong location for city
+- **Cause:** State not selected or wrong state/country
+- **Solution:**
+  - Always select country and state (if applicable) first
+  - Double-check state matches city
+  - Remove and re-add with correct state/country
 
 ---
 
@@ -294,10 +280,11 @@ geocodePostalCode("2000", "CH") // Switzerland
 - [ ] Settings modal opens/closes
 - [ ] Can add region
 - [ ] Can add country
-- [ ] **Can select country for postal code**
-- [ ] **Postal code format hint updates per country**
-- [ ] Can add postal code (US, Canada, UK, Australia)
-- [ ] **Same postal code in different countries creates different locations**
+- [ ] **Can select country for city**
+- [ ] **State selector appears for countries with states**
+- [ ] **State selection is required for US cities**
+- [ ] Can add city (US with state, international without state)
+- [ ] **Same city name in different states creates different locations**
 - [ ] Can remove location
 - [ ] News feed shows articles
 - [ ] Can click article to analyze
@@ -336,10 +323,11 @@ geocodePostalCode("2000", "CH") // Switzerland
    - Popular news sources
    - User engagement metrics
 
-6. **Postal Code Enhancements**
-   - Auto-detect country from format
+6. **City Tracking Enhancements**
+   - Auto-suggest cities as you type
    - Show map preview
    - Radius adjustment (50-500 miles)
+   - Support for neighborhoods/districts
 
 ---
 
@@ -349,12 +337,12 @@ If you encounter issues:
 1. Check console for errors
 2. Verify API key in `.env`
 3. Check NewsAPI dashboard for usage
-4. Verify country selection for postal codes
+4. Verify country and state selection for cities
 5. Review this guide
 
 **Questions?** Open an issue or contact support.
 
 ---
 
-**Feature Status:** ✅ Complete and Ready for Testing  
-**Latest Update:** Added country selector for postal codes to eliminate ambiguity
+**Feature Status:** ✅ Complete and Ready for Testing
+**Latest Update:** Replaced postal code tracking with city/state/country selection for precise location identification. News radius changed to 100 miles.

@@ -8,6 +8,10 @@ export interface Message {
   content: string;
   timestamp: number;
   quickReplies?: string[];
+  sources?: Array<{
+    title: string;
+    url: string;
+  }>;
 }
 
 export interface ConversationContext {
@@ -16,6 +20,7 @@ export interface ConversationContext {
   articleSummary: string;
   articleText?: string; // Full article text for RAG context
   articleTitle?: string;
+  articleUrl?: string; // Article URL for source attribution
 }
 
 export class ConversationAgent {
@@ -71,6 +76,7 @@ export class ConversationAgent {
         articleTitle: this.context.articleTitle || this.context.classification.articleTitle || 'Crisis Article',
         articleText: this.context.articleText || this.context.articleSummary,
         articleSummary: this.context.articleSummary,
+        articleUrl: this.context.articleUrl || this.context.classification.articleUrl,
         classification: {
           cause: this.context.classification.cause,
           geoName: this.context.classification.geoName,
@@ -122,13 +128,14 @@ export class ConversationAgent {
         this.ragHistory = this.ragHistory.slice(-20);
       }
 
-      // Create response message with suggestions as quick replies
+      // Create response message with suggestions as quick replies and sources
       const agentMessage: Message = {
         id: this.generateId(),
         role: 'agent',
         content: response.data.message,
         timestamp: Date.now(),
-        quickReplies: response.data.suggestions || []
+        quickReplies: response.data.suggestions || [],
+        sources: response.data.sources || []
       };
 
       this.conversationHistory.push(agentMessage);
@@ -156,20 +163,20 @@ export class ConversationAgent {
 
   private getFallbackMessage(error: string): string {
     // Provide context-aware fallback messages based on error type
-    if (error.includes('Too many requests')) {
-      return "I'm receiving a lot of questions right now. Please wait a moment and try again. In the meantime, the organizations we've matched are ready to help with this crisis.";
+    if (error.includes('Too many requests') || error.includes('rate limit') || error.includes('quota')) {
+      return "⏳ **Rate Limit Reached**\n\nI've reached my daily question limit. Please wait about 30 seconds and try again, or proceed directly to donation.\n\nThe organizations we've matched are verified and ready to help with this crisis.";
     }
     
-    if (error.includes('temporarily unavailable')) {
-      return "I'm temporarily unavailable, but I can tell you that the organizations we've matched specialize in this type of crisis and are ready to help. Would you like to proceed with a donation?";
+    if (error.includes('temporarily unavailable') || error.includes('high demand')) {
+      return "⏳ **Service Temporarily Busy**\n\nI'm experiencing high demand right now. Please wait a moment (about 30 seconds) and try your question again.\n\nIn the meantime, the organizations we've matched specialize in this type of crisis and are ready to help. Would you like to proceed with a donation?";
     }
     
     if (error.includes('connect')) {
-      return "I'm having trouble connecting right now. However, the organizations we've matched are vetted and ready to help. Would you like to learn more about them or proceed with a donation?";
+      return "🔌 **Connection Issue**\n\nI'm having trouble connecting right now. However, the organizations we've matched are vetted and ready to help.\n\nWould you like to learn more about them or proceed with a donation?";
     }
     
     // Generic fallback
-    return "I'm having a brief issue, but I'm here to help. The organizations we've matched are trusted and ready to assist with this crisis. What would you like to know?";
+    return "⚠️ **Temporary Issue**\n\nI'm having a brief issue, but I'm here to help. The organizations we've matched are trusted and ready to assist with this crisis.\n\nWhat would you like to know?";
   }
 
   private generateId(): string {

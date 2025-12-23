@@ -7,15 +7,30 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { MessageSquare, Send, Sparkles, ArrowRight, Globe, Info, AlertCircle, CheckCircle2, Lightbulb } from 'lucide-react';
+import { MessageSquare, Send, Sparkles, ArrowRight, Globe, Info, AlertCircle, CheckCircle2, Lightbulb, ExternalLink, BookOpen } from 'lucide-react';
 import { ConversationAgent, Message } from '@/utils/conversation-agent';
 import { cn } from '@/lib/utils';
+import { CauseCategory } from '@/types';
 
 interface ChatInterfaceProps {
   agent: ConversationAgent;
   onProceedToDonation: () => void;
   onBack: () => void;
+  articleTitle?: string;
+  classification?: any;
 }
+
+// Helper function to convert cause category to human-readable label
+const getCauseLabel = (cause: CauseCategory): string => {
+  const labels: Record<CauseCategory, string> = {
+    disaster_relief: 'disaster relief',
+    health_crisis: 'health crisis',
+    climate_events: 'climate event',
+    humanitarian_crisis: 'humanitarian crisis',
+    social_justice: 'social justice'
+  };
+  return labels[cause] || cause.replace(/_/g, ' ');
+};
 
 // Helper function to format message content with rich formatting
 const formatMessageContent = (content: string) => {
@@ -108,13 +123,18 @@ const formatMessageContent = (content: string) => {
   });
 };
 
-export function ChatInterface({ agent, onProceedToDonation, onBack }: ChatInterfaceProps) {
+export function ChatInterface({ agent, onProceedToDonation, onBack, articleTitle, classification }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const [lastRequestTime, setLastRequestTime] = useState(0);
+  const [cooldownRemaining, setCooldownRemaining] = useState(0);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  
+  // Rate limiting: 3 seconds between requests
+  const MIN_REQUEST_INTERVAL = 3000; // 3 seconds
 
   // Update agent when web search toggle changes
   useEffect(() => {
@@ -127,15 +147,44 @@ export function ChatInterface({ agent, onProceedToDonation, onBack }: ChatInterf
     setMessages([greeting]);
   }, []);
 
-  // Auto-scroll to bottom
+  // Auto-scroll to bottom when messages change
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    if (scrollAreaRef.current) {
+      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollContainer) {
+        // Use setTimeout to ensure DOM has updated
+        setTimeout(() => {
+          scrollContainer.scrollTop = scrollContainer.scrollHeight;
+        }, 100);
+      }
     }
   }, [messages, isTyping]);
 
+  // Cooldown timer effect
+  useEffect(() => {
+    if (cooldownRemaining > 0) {
+      const timer = setTimeout(() => {
+        setCooldownRemaining(prev => Math.max(0, prev - 100));
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [cooldownRemaining]);
+
   const handleSendMessage = async (text: string) => {
     if (!text.trim()) return;
+
+    // Check rate limit
+    const now = Date.now();
+    const timeSinceLastRequest = now - lastRequestTime;
+    
+    if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
+      const remaining = MIN_REQUEST_INTERVAL - timeSinceLastRequest;
+      setCooldownRemaining(remaining);
+      return;
+    }
+
+    // Update last request time
+    setLastRequestTime(now);
 
     // Add user message immediately
     const userMessage: Message = {
@@ -191,10 +240,16 @@ export function ChatInterface({ agent, onProceedToDonation, onBack }: ChatInterf
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-blue-500 flex items-center justify-center">
               <MessageSquare className="h-5 w-5 text-white" />
             </div>
-            <div>
-              <CardTitle className="text-xl">Ask Me Anything</CardTitle>
+            <div className="flex-1">
+              <CardTitle className="text-xl">
+                {articleTitle && classification
+                  ? `Ask About: ${articleTitle.length > 60 ? articleTitle.substring(0, 60) + '...' : articleTitle}`
+                  : 'Ask Me Anything'}
+              </CardTitle>
               <CardDescription>
-                I'll help you understand the situation
+                {classification
+                  ? `Learn more about this ${getCauseLabel(classification.cause)} in ${classification.geoName}`
+                  : 'I\'ll help you understand the situation'}
               </CardDescription>
             </div>
           </div>
@@ -202,7 +257,7 @@ export function ChatInterface({ agent, onProceedToDonation, onBack }: ChatInterf
 
         <CardContent className="p-0">
           {/* Messages */}
-          <ScrollArea className="h-[400px] p-4">
+          <ScrollArea ref={scrollAreaRef} className="h-[400px] p-4">
             <div className="space-y-6">
               {messages.map((message, index) => (
                 <div
@@ -248,6 +303,42 @@ export function ChatInterface({ agent, onProceedToDonation, onBack }: ChatInterf
                         </div>
                       )}
                     </div>
+                    
+                    {/* Sources Section */}
+                    {message.role === 'agent' && message.sources && message.sources.length > 0 && (
+                      <>
+                        <Separator className="my-4" />
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 mb-3">
+                            <BookOpen className="h-4 w-4 text-primary" />
+                            <span className="text-xs font-semibold text-foreground uppercase tracking-wide">
+                              Sources
+                            </span>
+                          </div>
+                          <div className="space-y-2">
+                            {message.sources.map((source, sourceIndex) => (
+                              <a
+                                key={sourceIndex}
+                                href={source.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/60 border border-border/50 hover:border-primary/30 transition-all duration-200 group"
+                              >
+                                <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary flex-shrink-0 mt-0.5 transition-colors" />
+                                <div className="flex-1 min-w-0">
+                                  <span className="text-sm text-foreground group-hover:text-primary line-clamp-2 transition-colors font-medium">
+                                    {source.title}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground mt-1 block truncate">
+                                    {source.url}
+                                  </span>
+                                </div>
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
                     
                     {/* Timestamp */}
                     <div className={cn(
@@ -308,8 +399,6 @@ export function ChatInterface({ agent, onProceedToDonation, onBack }: ChatInterf
                   </div>
                 </div>
               )}
-
-              <div ref={scrollRef} />
             </div>
           </ScrollArea>
 
@@ -336,30 +425,42 @@ export function ChatInterface({ agent, onProceedToDonation, onBack }: ChatInterf
                 ref={inputRef}
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                placeholder="Ask me anything about this crisis..."
-                disabled={isTyping}
+                placeholder={cooldownRemaining > 0 ? `Wait ${Math.ceil(cooldownRemaining / 1000)}s...` : "Ask me anything about this crisis..."}
+                disabled={isTyping || cooldownRemaining > 0}
                 className="flex-1"
                 autoFocus
               />
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 size="icon"
-                disabled={!inputValue.trim() || isTyping}
+                disabled={!inputValue.trim() || isTyping || cooldownRemaining > 0}
                 className="flex-shrink-0"
               >
                 <Send className="h-4 w-4" />
               </Button>
             </form>
             <div className="flex items-center justify-between mt-2">
-              <p className="text-xs text-muted-foreground">
-                Or use the quick reply buttons above
-              </p>
-              {webSearchEnabled && (
-                <Badge variant="outline" className="text-xs gap-1">
-                  <Globe className="h-3 w-3" />
-                  Web search active
-                </Badge>
-              )}
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-muted-foreground">
+                  {cooldownRemaining > 0
+                    ? `Please wait ${Math.ceil(cooldownRemaining / 1000)}s between messages`
+                    : 'Or use the quick reply buttons above'}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {cooldownRemaining > 0 && (
+                  <Badge variant="secondary" className="text-xs gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    Cooldown: {Math.ceil(cooldownRemaining / 1000)}s
+                  </Badge>
+                )}
+                {webSearchEnabled && (
+                  <Badge variant="outline" className="text-xs gap-1">
+                    <Globe className="h-3 w-3" />
+                    Web search active
+                  </Badge>
+                )}
+              </div>
             </div>
           </div>
         </CardContent>

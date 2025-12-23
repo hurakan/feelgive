@@ -46,7 +46,7 @@ export function FollowUpStoryNotification() {
               <Sparkles className="h-6 w-6 text-white" />
             </div>
             <div>
-              <CardTitle className="text-xl">Impact Update! 🎉</CardTitle>
+              <CardTitle className="text-xl">Impact Update!</CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
                 One week after your ${donation?.amount} donation
               </p>

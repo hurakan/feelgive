@@ -12,7 +12,7 @@ interface ImpactStoryCardProps {
 
 export function ImpactStoryCard({ story, donationAmount, onShare }: ImpactStoryCardProps) {
   const handleShare = () => {
-    const shareText = `${story.shareableQuote}\n\nI just donated $${donationAmount} through FeelGive 💙`;
+    const shareText = `${story.shareableQuote}\n\nI just donated $${donationAmount} through FeelGive`;
     
     if (navigator.share) {
       navigator.share({
@@ -46,18 +46,8 @@ export function ImpactStoryCard({ story, donationAmount, onShare }: ImpactStoryC
   };
 
   const getToneIcon = (tone: ImpactStory['emotionalTone']) => {
-    switch (tone) {
-      case 'hopeful':
-        return '🌟';
-      case 'urgent':
-        return '⚡';
-      case 'grateful':
-        return '🙏';
-      case 'inspiring':
-        return '✨';
-      default:
-        return '💙';
-    }
+    // Return empty string instead of emojis
+    return '';
   };
 
   return (
@@ -68,8 +58,7 @@ export function ImpactStoryCard({ story, donationAmount, onShare }: ImpactStoryC
             <Sparkles className="h-6 w-6 text-white" />
           </div>
           <div className="flex-1">
-            <CardTitle className="text-xl flex items-center gap-2">
-              <span>{getToneIcon(story.emotionalTone)}</span>
+            <CardTitle className="text-xl">
               Your Impact Story
             </CardTitle>
           </div>

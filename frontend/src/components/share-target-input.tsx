@@ -262,32 +262,6 @@ export function ShareTargetInput({ onAnalyzeUrl, onAnalyzeText, isAnalyzing = fa
         </CardContent>
       </Card>
 
-      {activeTab === 'url' && (
-        <div className="space-y-3">
-          <p className="text-sm font-medium text-center text-muted-foreground">
-            Or try one of these trusted sources
-          </p>
-          <div className="grid grid-cols-3 gap-2">
-            {[
-              { url: 'bbc.com/news', label: 'BBC News' },
-              { url: 'reuters.com', label: 'Reuters' },
-              { url: 'theguardian.com', label: 'Guardian' },
-            ].map((source) => (
-              <Button
-                key={source.url}
-                variant="outline"
-                size="sm"
-                className="h-auto py-3 transition-all duration-200 hover:scale-105 active:scale-95 hover:border-primary hover:bg-primary/5"
-                onClick={() => handleExampleClick(source.url)}
-                disabled={isAnalyzing}
-                aria-label={`Try ${source.label}`}
-              >
-                <span className="text-xs font-medium">{source.label}</span>
-              </Button>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

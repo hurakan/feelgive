@@ -14,6 +14,7 @@ import usersRouter from './routes/users.js';
 import classificationsRouter from './routes/classifications.js';
 import chatRouter from './routes/chat.js';
 import organizationsRouter from './routes/organizations.js';
+import newsRouter from './routes/news.js';
 
 // Load environment variables
 dotenv.config();
@@ -94,6 +95,7 @@ app.use(`/api/${API_VERSION}/users`, usersRouter);
 app.use(`/api/${API_VERSION}/classifications`, classificationsRouter);
 app.use(`/api/${API_VERSION}/chat`, chatRouter);
 app.use(`/api/${API_VERSION}/organizations`, organizationsRouter);
+app.use(`/api/${API_VERSION}/news`, newsRouter);
 
 /**
  * @swagger
@@ -143,6 +145,7 @@ app.get('/', (_req, res) => {
       classifications: `/api/${API_VERSION}/classifications`,
       chat: `/api/${API_VERSION}/chat`,
       organizations: `/api/${API_VERSION}/organizations`,
+      news: `/api/${API_VERSION}/news`,
     },
   });
 });

@@ -37,10 +37,12 @@ export async function fetchNewsForLocation(
 
     let articles: NewsArticle[] = [];
 
-    if (location.type === 'postal_code' && location.coordinates) {
-      // For postal codes, search by coordinates (not directly supported by NewsAPI)
-      // Fallback to searching by nearby city/region
-      articles = await fetchNewsByQuery(location.displayName, location, limit, currentPage);
+    if (location.type === 'city' && location.coordinates) {
+      // For cities, search by city name with state/country context
+      const searchQuery = location.state
+        ? `${location.value} ${location.state}`
+        : location.value;
+      articles = await fetchNewsByQuery(searchQuery, location, limit, currentPage);
     } else if (location.type === 'country') {
       // Fetch news FROM and ABOUT the country
       const fromCountry = await fetchNewsByCountry(location.value, location, Math.ceil(limit / 2), currentPage);

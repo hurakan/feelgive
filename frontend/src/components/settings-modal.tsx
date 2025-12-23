@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,18 +7,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MapPin, X, Plus, Loader2 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { MapPin, X, Plus, Loader2, Newspaper } from 'lucide-react';
+import { NewsAPIAdmin } from '@/components/news-api-admin';
 import { TrackedLocation, LocationType } from '@/types';
-import { 
-  getTrackedLocations, 
-  saveTrackedLocation, 
+import {
+  getTrackedLocations,
+  saveTrackedLocation,
   removeTrackedLocation,
   generateLocationId,
   isLocationAlreadyTracked,
   REGIONS,
-  COUNTRIES
+  COUNTRIES,
+  COUNTRIES_WITH_STATES,
+  getStatesForCountry
 } from '@/utils/tracked-locations';
-import { geocodePostalCode, isValidPostalCode } from '@/utils/geocoding';
+import { geocodeCity, isValidCity } from '@/utils/geocoding';
 import { toast } from 'sonner';
 
 interface SettingsModalProps {
@@ -27,45 +31,50 @@ interface SettingsModalProps {
   onLocationsChanged: () => void;
 }
 
-// Countries that support postal codes
-const POSTAL_CODE_COUNTRIES = [
-  { code: 'US', name: 'United States' },
-  { code: 'CA', name: 'Canada' },
-  { code: 'GB', name: 'United Kingdom' },
-  { code: 'AU', name: 'Australia' },
-  { code: 'DE', name: 'Germany' },
-  { code: 'FR', name: 'France' },
-  { code: 'IT', name: 'Italy' },
-  { code: 'ES', name: 'Spain' },
-  { code: 'NL', name: 'Netherlands' },
-  { code: 'BE', name: 'Belgium' },
-  { code: 'CH', name: 'Switzerland' },
-  { code: 'AT', name: 'Austria' },
-  { code: 'SE', name: 'Sweden' },
-  { code: 'NO', name: 'Norway' },
-  { code: 'DK', name: 'Denmark' },
-  { code: 'FI', name: 'Finland' },
-  { code: 'PL', name: 'Poland' },
-  { code: 'CZ', name: 'Czech Republic' },
-  { code: 'PT', name: 'Portugal' },
-  { code: 'IE', name: 'Ireland' },
-  { code: 'NZ', name: 'New Zealand' },
-  { code: 'JP', name: 'Japan' },
-  { code: 'KR', name: 'South Korea' },
-  { code: 'SG', name: 'Singapore' },
-  { code: 'IN', name: 'India' },
-  { code: 'BR', name: 'Brazil' },
-  { code: 'MX', name: 'Mexico' },
-  { code: 'AR', name: 'Argentina' },
-  { code: 'ZA', name: 'South Africa' },
-];
 
 export function SettingsModal({ open, onOpenChange, onLocationsChanged }: SettingsModalProps) {
+  // Track original locations to detect changes
+  const [originalLocations, setOriginalLocations] = useState<TrackedLocation[]>(getTrackedLocations());
   const [locations, setLocations] = useState<TrackedLocation[]>(getTrackedLocations());
   const [locationType, setLocationType] = useState<LocationType>('country');
   const [locationValue, setLocationValue] = useState('');
-  const [postalCountry, setPostalCountry] = useState('US'); // Default to US
+  const [cityCountry, setCityCountry] = useState('US'); // Default to US
+  const [cityState, setCityState] = useState('');
   const [isAdding, setIsAdding] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+  const [availableStates, setAvailableStates] = useState<string[]>([]);
+
+  // Reset state when modal opens
+  useEffect(() => {
+    if (open) {
+      const currentLocations = getTrackedLocations();
+      setOriginalLocations(currentLocations);
+      setLocations(currentLocations);
+      setLocationValue('');
+      setCityCountry('US');
+      setCityState('');
+      setAvailableStates(getStatesForCountry('US'));
+      setHasChanges(false);
+    }
+  }, [open]);
+
+  // Check if there are unsaved changes
+  useEffect(() => {
+    const changed = JSON.stringify(locations) !== JSON.stringify(originalLocations);
+    setHasChanges(changed);
+  }, [locations, originalLocations]);
+
+  // Update available states when country changes
+  useEffect(() => {
+    if (locationType === 'city') {
+      const states = getStatesForCountry(cityCountry);
+      setAvailableStates(states);
+      // Reset state selection if country changed
+      if (states.length > 0 && !states.includes(cityState)) {
+        setCityState('');
+      }
+    }
+  }, [cityCountry, locationType]);
 
   const handleAddLocation = async () => {
     if (!locationValue.trim()) {
@@ -73,13 +82,23 @@ export function SettingsModal({ open, onOpenChange, onLocationsChanged }: Settin
       return;
     }
 
-    // For postal codes, check with country code
-    const checkValue = locationType === 'postal_code' 
-      ? `${locationValue}-${postalCountry}` 
+    // For cities, check with state and country
+    const checkValue = locationType === 'city'
+      ? `${locationValue}-${cityState}-${cityCountry}`
       : locationValue;
 
-    if (isLocationAlreadyTracked(checkValue)) {
-      toast.error('This location is already being tracked');
+    // Check if location already exists in current state
+    const alreadyExists = locations.some(loc => {
+      if (locationType === 'city') {
+        return loc.value === locationValue.trim() &&
+               loc.state === cityState &&
+               loc.country === cityCountry;
+      }
+      return loc.value === locationValue.trim() && loc.type === locationType;
+    });
+
+    if (alreadyExists) {
+      toast.error('This location is already in your list');
       return;
     }
 
@@ -88,26 +107,44 @@ export function SettingsModal({ open, onOpenChange, onLocationsChanged }: Settin
     try {
       let newLocation: TrackedLocation;
 
-      if (locationType === 'postal_code') {
-        if (!isValidPostalCode(locationValue)) {
-          toast.error('Invalid postal code format');
+      if (locationType === 'city') {
+        if (!isValidCity(locationValue)) {
+          toast.error('Invalid city name');
           setIsAdding(false);
           return;
         }
 
-        const geocoded = await geocodePostalCode(locationValue, postalCountry);
-        
-        if (!geocoded) {
-          toast.error(`Could not find postal code "${locationValue}" in ${POSTAL_CODE_COUNTRIES.find(c => c.code === postalCountry)?.name}`);
+        // Validate state is selected for countries that require it
+        if (availableStates.length > 0 && !cityState) {
+          toast.error('Please select a state');
           setIsAdding(false);
           return;
         }
+
+        const geocoded = await geocodeCity(locationValue, cityState, cityCountry);
+        
+        if (!geocoded) {
+          const locationDesc = cityState
+            ? `${locationValue}, ${cityState}`
+            : locationValue;
+          const countryName = COUNTRIES_WITH_STATES.find(c => c.code === cityCountry)?.name || cityCountry;
+          toast.error(`Could not find city "${locationDesc}" in ${countryName}`);
+          setIsAdding(false);
+          return;
+        }
+
+        const displayParts = [locationValue];
+        if (cityState) displayParts.push(cityState);
+        const countryName = COUNTRIES_WITH_STATES.find(c => c.code === cityCountry)?.name || cityCountry;
+        displayParts.push(countryName);
 
         newLocation = {
           id: generateLocationId(),
-          type: 'postal_code',
-          value: `${locationValue}-${postalCountry}`, // Store with country code to avoid duplicates
-          displayName: `${locationValue} (${geocoded.displayName})`,
+          type: 'city',
+          value: locationValue.trim(),
+          state: cityState || undefined,
+          country: cityCountry,
+          displayName: displayParts.join(', '),
           coordinates: {
             lat: geocoded.lat,
             lng: geocoded.lng
@@ -124,12 +161,12 @@ export function SettingsModal({ open, onOpenChange, onLocationsChanged }: Settin
         };
       }
 
-      saveTrackedLocation(newLocation);
-      setLocations(getTrackedLocations());
+      // Add to local state (not saved yet)
+      setLocations([...locations, newLocation]);
       setLocationValue('');
-      setPostalCountry('US'); // Reset to default
-      onLocationsChanged();
-      toast.success(`Now tracking ${newLocation.displayName}`);
+      setCityCountry('US'); // Reset to default
+      setCityState('');
+      toast.success(`Added ${newLocation.displayName} (not saved yet)`);
     } catch (error) {
       toast.error('Failed to add location');
     } finally {
@@ -137,76 +174,77 @@ export function SettingsModal({ open, onOpenChange, onLocationsChanged }: Settin
     }
   };
 
-  const handleRemoveLocation = (id: string, displayName: string) => {
-    console.log('Removing location:', id, displayName);
-    
+  const handleRemoveLocation = (id: string) => {
+    // Remove from local state (not saved yet)
+    setLocations(locations.filter(loc => loc.id !== id));
+  };
+
+  const handleAccept = () => {
     try {
-      removeTrackedLocation(id);
-      const updatedLocations = getTrackedLocations();
-      setLocations(updatedLocations);
+      // Clear all existing locations
+      const existingLocations = getTrackedLocations();
+      existingLocations.forEach(loc => removeTrackedLocation(loc.id));
+      
+      // Save all new locations
+      locations.forEach(loc => saveTrackedLocation(loc));
+      
+      // Update original locations to match current
+      setOriginalLocations(locations);
+      setHasChanges(false);
+      
+      // Notify parent component
       onLocationsChanged();
-      toast.success(`Removed ${displayName}`);
+      
+      toast.success('Settings saved successfully');
+      onOpenChange(false);
     } catch (error) {
-      console.error('Error removing location:', error);
-      toast.error('Failed to remove location');
+      console.error('Error saving settings:', error);
+      toast.error('Failed to save settings');
     }
+  };
+
+  const handleCancel = () => {
+    if (hasChanges) {
+      // Revert to original locations
+      setLocations(originalLocations);
+      setHasChanges(false);
+      toast.info('Changes discarded');
+    }
+    onOpenChange(false);
   };
 
   const getLocationTypeLabel = (type: LocationType): string => {
     const labels = {
       region: 'Region',
       country: 'Country',
-      postal_code: 'Postal Code'
+      city: 'City'
     };
     return labels[type];
   };
 
-  const getPostalCodePlaceholder = (): string => {
-    const examples: { [key: string]: string } = {
-      'US': '90210',
-      'CA': 'M5H 2N2',
-      'GB': 'SW1A 1AA',
-      'AU': '2000',
-      'DE': '10115',
-      'FR': '75001',
-      'IT': '00100',
-      'ES': '28001',
-      'NL': '1012',
-      'BE': '1000',
-      'CH': '8001',
-      'AT': '1010',
-      'SE': '111 22',
-      'NO': '0001',
-      'DK': '1050',
-      'FI': '00100',
-      'PL': '00-001',
-      'CZ': '110 00',
-      'PT': '1000-001',
-      'IE': 'D01',
-      'NZ': '1010',
-      'JP': '100-0001',
-      'KR': '03000',
-      'SG': '018956',
-      'IN': '110001',
-      'BR': '01310-100',
-      'MX': '01000',
-      'AR': 'C1000',
-      'ZA': '0001',
-    };
-    return examples[postalCountry] || '12345';
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="text-2xl">Settings</DialogTitle>
           <DialogDescription>
-            Track news from specific regions, countries, or postal codes
+            Manage your news tracking and API sources
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden flex flex-col gap-6">
+        <Tabs defaultValue="locations" className="flex-1 overflow-hidden flex flex-col">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="locations" className="flex items-center gap-2">
+              <MapPin className="h-4 w-4" />
+              Tracked Locations
+            </TabsTrigger>
+            <TabsTrigger value="news-api" className="flex items-center gap-2">
+              <Newspaper className="h-4 w-4" />
+              News API
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="locations" className="flex-1 overflow-hidden flex flex-col gap-6 mt-4">
           {/* Add Location Section */}
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
@@ -217,14 +255,20 @@ export function SettingsModal({ open, onOpenChange, onLocationsChanged }: Settin
               {/* Location Type Selector */}
               <div>
                 <Label htmlFor="location-type">Location Type</Label>
-                <Select value={locationType} onValueChange={(v) => setLocationType(v as LocationType)}>
+                <Select
+                  value={locationType}
+                  onValueChange={(v) => {
+                    setLocationType(v as LocationType);
+                    setLocationValue(''); // Reset value when type changes
+                  }}
+                >
                   <SelectTrigger id="location-type">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent position="popper" sideOffset={5}>
                     <SelectItem value="region">Region</SelectItem>
                     <SelectItem value="country">Country</SelectItem>
-                    <SelectItem value="postal_code">Postal Code</SelectItem>
+                    <SelectItem value="city">City</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -237,7 +281,7 @@ export function SettingsModal({ open, onOpenChange, onLocationsChanged }: Settin
                     <SelectTrigger id="location-value">
                       <SelectValue placeholder="Select a region" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent position="popper" sideOffset={5} className="max-h-[300px]">
                       {REGIONS.map(region => (
                         <SelectItem key={region} value={region}>{region}</SelectItem>
                       ))}
@@ -251,7 +295,7 @@ export function SettingsModal({ open, onOpenChange, onLocationsChanged }: Settin
                     <SelectTrigger id="location-value">
                       <SelectValue placeholder="Select a country" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent position="popper" sideOffset={5} className="max-h-[300px]">
                       {COUNTRIES.map(country => (
                         <SelectItem key={country} value={country}>{country}</SelectItem>
                       ))}
@@ -260,15 +304,15 @@ export function SettingsModal({ open, onOpenChange, onLocationsChanged }: Settin
                 </div>
               ) : (
                 <>
-                  {/* Country Selector for Postal Code */}
+                  {/* Country Selector for City */}
                   <div>
-                    <Label htmlFor="postal-country">Country</Label>
-                    <Select value={postalCountry} onValueChange={setPostalCountry}>
-                      <SelectTrigger id="postal-country">
+                    <Label htmlFor="city-country">Country</Label>
+                    <Select value={cityCountry} onValueChange={setCityCountry}>
+                      <SelectTrigger id="city-country">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
-                        {POSTAL_CODE_COUNTRIES.map(country => (
+                      <SelectContent position="popper" sideOffset={5} className="max-h-[300px]">
+                        {COUNTRIES_WITH_STATES.map(country => (
                           <SelectItem key={country.code} value={country.code}>
                             {country.name}
                           </SelectItem>
@@ -277,18 +321,37 @@ export function SettingsModal({ open, onOpenChange, onLocationsChanged }: Settin
                     </Select>
                   </div>
 
-                  {/* Postal Code Input */}
+                  {/* State Selector (if country has states) */}
+                  {availableStates.length > 0 && (
+                    <div>
+                      <Label htmlFor="city-state">State/Province</Label>
+                      <Select value={cityState} onValueChange={setCityState}>
+                        <SelectTrigger id="city-state">
+                          <SelectValue placeholder="Select a state" />
+                        </SelectTrigger>
+                        <SelectContent position="popper" sideOffset={5} className="max-h-[300px]">
+                          {availableStates.map(state => (
+                            <SelectItem key={state} value={state}>
+                              {state}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {/* City Input */}
                   <div>
-                    <Label htmlFor="location-value">Postal/Zip Code</Label>
+                    <Label htmlFor="location-value">City Name</Label>
                     <Input
                       id="location-value"
-                      placeholder={`e.g., ${getPostalCodePlaceholder()}`}
+                      placeholder="e.g., Los Angeles"
                       value={locationValue}
                       onChange={(e) => setLocationValue(e.target.value)}
                       disabled={isAdding}
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      Format varies by country. Example for {POSTAL_CODE_COUNTRIES.find(c => c.code === postalCountry)?.name}: {getPostalCodePlaceholder()}
+                      Enter the city name. {availableStates.length > 0 ? 'State selection is required.' : ''}
                     </p>
                   </div>
                 </>
@@ -313,9 +376,9 @@ export function SettingsModal({ open, onOpenChange, onLocationsChanged }: Settin
               )}
             </Button>
 
-            {locationType === 'postal_code' && (
+            {locationType === 'city' && (
               <p className="text-xs text-muted-foreground">
-                News will be fetched within a 200-mile radius of this postal code
+                News will be fetched within a 100-mile radius of this city
               </p>
             )}
           </div>
@@ -359,7 +422,7 @@ export function SettingsModal({ open, onOpenChange, onLocationsChanged }: Settin
                         size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleRemoveLocation(location.id, location.displayName);
+                          handleRemoveLocation(location.id);
                         }}
                         className="flex-shrink-0 h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
                         aria-label={`Remove ${location.displayName}`}
@@ -372,7 +435,29 @@ export function SettingsModal({ open, onOpenChange, onLocationsChanged }: Settin
               </ScrollArea>
             )}
           </div>
-        </div>
+          </TabsContent>
+
+          <TabsContent value="news-api" className="flex-1 overflow-hidden flex flex-col mt-4">
+            <div className="flex-1 overflow-auto">
+              <NewsAPIAdmin />
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        <DialogFooter className="gap-2 mt-4">
+          <Button
+            variant="outline"
+            onClick={handleCancel}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleAccept}
+            disabled={!hasChanges}
+          >
+            Accept Changes
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

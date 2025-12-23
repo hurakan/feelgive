@@ -332,7 +332,8 @@ export default function Index() {
       matchedCharities: verifiedCharities,
       articleSummary: summary,
       articleText: text,
-      articleTitle: title
+      articleTitle: title,
+      articleUrl: url !== 'pasted-content' ? url : undefined
     };
     setConversationAgent(new ConversationAgent(context));
     
@@ -653,6 +654,8 @@ export default function Index() {
                   agent={conversationAgent}
                   onProceedToDonation={() => setFlowStep('classification')}
                   onBack={() => setFlowStep('classification')}
+                  articleTitle={articleTitle}
+                  classification={classification}
                 />
               )}
 

@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
 import { webSearchService } from './web-search.js';
+import { responseCacheService } from './response-cache.js';
 
 interface ChatMessage {
   role: 'user' | 'model';
@@ -10,6 +11,7 @@ interface ArticleContext {
   articleTitle: string;
   articleText: string;
   articleSummary: string;
+  articleUrl?: string;
   classification: {
     cause: string;
     geoName: string;
@@ -29,6 +31,14 @@ interface GenerateResponseParams {
   context: ArticleContext;
   history: ChatMessage[];
   enableWebSearch?: boolean;
+}
+
+interface GenerateResponseResult {
+  message: string;
+  sources: Array<{
+    title: string;
+    url: string;
+  }>;
 }
 
 class GeminiService {
@@ -82,22 +92,57 @@ ${context.articleText}
 MATCHED CHARITIES:
 ${charitiesList}
 
-${webSearchResults ? `\n${webSearchResults}\n` : ''}
+${webSearchResults ? `ADDITIONAL WEB SEARCH RESULTS:
+${webSearchResults}
+` : ''}
 GUIDELINES:
-1. ACCURACY: Answer ONLY based on the provided Article Content and your general knowledge of the crisis region. Do not make up facts.
-2. EMPATHY: Use a compassionate, serious, but hopeful tone.
-3. ACTION-ORIENTED: When appropriate, subtly mention how the matched charities can help with the specific needs mentioned in the article.
-4. FORMAT: Use Markdown. Keep answers concise (under 150 words) unless asked for detail.
-5. SAFETY: Do not answer questions unrelated to the crisis, charity, or humanitarian aid.
-6. RELEVANCE: If a question is off-topic, politely redirect the user back to the crisis and how they can help.`;
+1. BREVITY: Keep responses concise (2-4 paragraphs max). Be direct and focused. Avoid lengthy explanations unless specifically asked.
+2. ACCURACY: Prioritize information from the provided Article Content. ${webSearchResults ? 'Use the web search results above to provide current information when relevant.' : 'If the user asks for information beyond the article (like latest updates), let them know they can enable web search for more current information.'} Do not make up facts.
+3. EMPATHY: Use a compassionate, serious, but hopeful tone.
+4. ACTION-ORIENTED: When appropriate, subtly mention how the matched charities can help with the specific needs mentioned in the article.
+5. FORMAT: Use Markdown. Keep responses focused and relevant. Always complete your sentences - never end mid-sentence.
+6. SAFETY: Do not answer questions unrelated to the crisis, charity, or humanitarian aid.
+7. RELEVANCE: If a question is off-topic, politely redirect the user back to the crisis and how they can help.
+8. KNOWLEDGE SCOPE: You can answer questions about:
+   - The crisis described in the article
+   - General information about the affected region
+   - How humanitarian aid works in these situations
+   - The matched charities and their work
+   - How donations help in crisis situations
+   - General crisis response and humanitarian principles`;
   }
 
   /**
    * Generates a response using Google Gemini API
    */
-  async generateResponse({ message, context, history, enableWebSearch = false }: GenerateResponseParams): Promise<string> {
+  async generateResponse({ message, context, history, enableWebSearch = false }: GenerateResponseParams): Promise<GenerateResponseResult> {
     try {
+      // Check cache first (only for non-web-search queries to keep cache simple)
+      if (!enableWebSearch) {
+        const cached = responseCacheService.get(message, {
+          articleTitle: context.articleTitle,
+          cause: context.classification.cause,
+          geoName: context.classification.geoName
+        });
+
+        if (cached) {
+          return {
+            message: cached.response,
+            sources: cached.sources
+          };
+        }
+      }
+
       let webSearchResults: string | undefined;
+      const sources: Array<{ title: string; url: string }> = [];
+
+      // Always include the original article as a source if we have a URL
+      if (context.articleUrl) {
+        sources.push({
+          title: context.articleTitle,
+          url: context.articleUrl
+        });
+      }
 
       // Perform web search if enabled and available
       if (enableWebSearch && webSearchService.isAvailable()) {
@@ -111,6 +156,15 @@ GUIDELINES:
 
           const searchResponse = await webSearchService.search(searchQuery);
           webSearchResults = webSearchService.formatResultsForPrompt(searchResponse);
+          
+          // Add web search results as sources
+          searchResponse.results.forEach(result => {
+            sources.push({
+              title: result.title,
+              url: result.link
+            });
+          });
+          
           console.log('Web search completed successfully');
         } catch (searchError) {
           console.error('Web search failed, continuing without it:', searchError);
@@ -141,7 +195,7 @@ GUIDELINES:
           ...chatHistory,
         ],
         generationConfig: {
-          maxOutputTokens: 500,
+          maxOutputTokens: 800, // Reduced from 2048 to save on rate limits
           temperature: 0.7,
           topP: 0.8,
           topK: 40,
@@ -149,15 +203,34 @@ GUIDELINES:
       });
 
       // Send the user's message
-      const result = await chat.sendMessage(message);
-      const response = result.response;
+      const geminiResult = await chat.sendMessage(message);
+      const response = geminiResult.response;
       const text = response.text();
 
       if (!text) {
         throw new Error('Empty response from Gemini API');
       }
 
-      return text;
+      const finalResult = {
+        message: text,
+        sources
+      };
+
+      // Cache the response (only for non-web-search queries)
+      if (!enableWebSearch) {
+        responseCacheService.set(
+          message,
+          {
+            articleTitle: context.articleTitle,
+            cause: context.classification.cause,
+            geoName: context.classification.geoName
+          },
+          text,
+          sources
+        );
+      }
+
+      return finalResult;
     } catch (error) {
       console.error('Error generating response from Gemini:', error);
       

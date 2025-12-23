@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { geminiService } from '../services/gemini.js';
 import { chatLimiter } from '../middleware/rateLimiter.js';
+import { responseCacheService } from '../services/response-cache.js';
 
 const router = express.Router();
 
@@ -98,6 +99,16 @@ router.use(chatLimiter);
  *           items:
  *             type: string
  *           description: 2-3 short follow-up questions
+ *         sources:
+ *           type: array
+ *           items:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *               url:
+ *                 type: string
+ *           description: Sources used to answer the question
  */
 
 // Validation middleware
@@ -122,6 +133,10 @@ const validateChatRequest = [
     .isString()
     .notEmpty()
     .withMessage('Article summary is required'),
+  body('context.articleUrl')
+    .optional()
+    .isString()
+    .withMessage('Article URL must be a string'),
   body('context.classification')
     .isObject()
     .withMessage('Classification is required'),
@@ -236,8 +251,9 @@ router.post('/message', validateChatRequest, async (req: Request, res: Response)
     const suggestions = geminiService.generateSuggestions(context);
 
     res.json({
-      message: aiResponse,
+      message: aiResponse.message,
       suggestions,
+      sources: aiResponse.sources,
     });
   } catch (error) {
     console.error('Error processing chat message:', error);
@@ -327,6 +343,116 @@ router.get('/health', (_req: Request, res: Response): void => {
     res.status(500).json({
       status: 'error',
       error: 'Failed to check service health',
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/v1/chat/cache/stats:
+ *   get:
+ *     summary: Get response cache statistics
+ *     tags: [Chat]
+ *     responses:
+ *       200:
+ *         description: Cache statistics retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 stats:
+ *                   type: object
+ *                   properties:
+ *                     totalEntries:
+ *                       type: number
+ *                     totalHits:
+ *                       type: number
+ *                     totalMisses:
+ *                       type: number
+ *                     hitRate:
+ *                       type: number
+ *                     oldestEntry:
+ *                       type: number
+ *                       nullable: true
+ *                     newestEntry:
+ *                       type: number
+ *                       nullable: true
+ */
+router.get('/cache/stats', (_req: Request, res: Response): void => {
+  try {
+    const stats = responseCacheService.getStats();
+    res.json({ stats });
+  } catch (error) {
+    console.error('Error getting cache stats:', error);
+    res.status(500).json({
+      error: 'Failed to retrieve cache statistics',
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/v1/chat/cache/debug:
+ *   get:
+ *     summary: Get detailed cache debug information (development only)
+ *     tags: [Chat]
+ *     responses:
+ *       200:
+ *         description: Cache debug info retrieved successfully
+ *       403:
+ *         description: Only available in development mode
+ */
+router.get('/cache/debug', (_req: Request, res: Response): void => {
+  try {
+    // Only allow in development
+    if (process.env.NODE_ENV === 'production') {
+      res.status(403).json({
+        error: 'Debug endpoint only available in development mode',
+      });
+      return;
+    }
+
+    const debugInfo = responseCacheService.getDebugInfo();
+    res.json(debugInfo);
+  } catch (error) {
+    console.error('Error getting cache debug info:', error);
+    res.status(500).json({
+      error: 'Failed to retrieve cache debug information',
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/v1/chat/cache/clear:
+ *   post:
+ *     summary: Clear the response cache (development only)
+ *     tags: [Chat]
+ *     responses:
+ *       200:
+ *         description: Cache cleared successfully
+ *       403:
+ *         description: Only available in development mode
+ */
+router.post('/cache/clear', (_req: Request, res: Response): void => {
+  try {
+    // Only allow in development
+    if (process.env.NODE_ENV === 'production') {
+      res.status(403).json({
+        error: 'Cache clear only available in development mode',
+      });
+      return;
+    }
+
+    responseCacheService.clear();
+    res.json({
+      message: 'Cache cleared successfully',
+    });
+  } catch (error) {
+    console.error('Error clearing cache:', error);
+    res.status(500).json({
+      error: 'Failed to clear cache',
     });
   }
 });

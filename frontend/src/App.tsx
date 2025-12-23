@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import Share from "./pages/share";
 import TestClassification from "./pages/test-classification";
 import DonationSuccess from "./pages/donation-success";
+import AdminNewsPage from "./pages/admin-news";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,6 +23,7 @@ const App = () => (
           <Route path="/share" element={<Share />} />
           <Route path="/test-classification" element={<TestClassification />} />
           <Route path="/donation-success" element={<DonationSuccess />} />
+          <Route path="/admin/news" element={<AdminNewsPage />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
