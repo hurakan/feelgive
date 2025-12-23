@@ -71,7 +71,33 @@ class WebSearchService {
     // Extract key terms from the question
     const question = userQuestion.toLowerCase();
     
-    // If question is about specific aspects, focus the search
+    // Check if question is asking about a different location/topic than the article
+    // Common patterns: "where are X in Y", "what about X in Y", "are there X in Y"
+    const isGeneralQuery =
+      (question.includes('where') && (question.includes(' in ') || question.includes(' across '))) ||
+      (question.includes('what about') && question.includes(' in ')) ||
+      (question.includes('are there') && question.includes(' in ')) ||
+      (question.includes('today') && !question.includes(articleContext.geoName.toLowerCase())) ||
+      (question.includes('currently') && !question.includes(articleContext.geoName.toLowerCase())) ||
+      (question.includes('right now') && !question.includes(articleContext.geoName.toLowerCase()));
+    
+    // If it's a general query not about the article's location, use the question directly
+    if (isGeneralQuery) {
+      // Clean up the question for search
+      const cleanQuery = userQuestion
+        .replace(/[?.,!]/g, '')
+        .replace(/\b(where|what|are|is|the|a|an)\b/gi, '')
+        .trim();
+      
+      // Add "today" or "current" if asking about present time
+      if (question.includes('today') || question.includes('currently') || question.includes('right now')) {
+        return `${cleanQuery} today current`;
+      }
+      
+      return cleanQuery;
+    }
+    
+    // If question is about specific aspects of the article's crisis, focus the search
     if (question.includes('how can') || question.includes('what can')) {
       return `${articleContext.cause} ${articleContext.geoName} humanitarian response`;
     }

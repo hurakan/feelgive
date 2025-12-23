@@ -43,6 +43,7 @@ export function SettingsModal({ open, onOpenChange, onLocationsChanged }: Settin
   const [isAdding, setIsAdding] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [availableStates, setAvailableStates] = useState<string[]>([]);
+  const [showNewsAPITab, setShowNewsAPITab] = useState(false);
 
   // Reset state when modal opens
   useEffect(() => {
@@ -55,8 +56,30 @@ export function SettingsModal({ open, onOpenChange, onLocationsChanged }: Settin
       setCityState('');
       setAvailableStates(getStatesForCountry('US'));
       setHasChanges(false);
+      setShowNewsAPITab(false); // Reset tab visibility when modal opens
     }
   }, [open]);
+
+  // Listen for secret key combination: Ctrl+Shift+N (or Cmd+Shift+N on Mac)
+  useEffect(() => {
+    if (!open) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Check for Ctrl+Shift+N (Windows/Linux) or Cmd+Shift+N (Mac)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'N') {
+        e.preventDefault();
+        setShowNewsAPITab(prev => !prev); // Toggle visibility
+        if (!showNewsAPITab) {
+          toast.success('News API tab unlocked');
+        } else {
+          toast.info('News API tab hidden');
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [open, showNewsAPITab]);
 
   // Check if there are unsaved changes
   useEffect(() => {
@@ -233,15 +256,17 @@ export function SettingsModal({ open, onOpenChange, onLocationsChanged }: Settin
         </DialogHeader>
 
         <Tabs defaultValue="locations" className="flex-1 overflow-hidden flex flex-col">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className={`grid w-full ${showNewsAPITab ? 'grid-cols-2' : 'grid-cols-1'}`}>
             <TabsTrigger value="locations" className="flex items-center gap-2">
               <MapPin className="h-4 w-4" />
               Tracked Locations
             </TabsTrigger>
-            <TabsTrigger value="news-api" className="flex items-center gap-2">
-              <Newspaper className="h-4 w-4" />
-              News API
-            </TabsTrigger>
+            {showNewsAPITab && (
+              <TabsTrigger value="news-api" className="flex items-center gap-2">
+                <Newspaper className="h-4 w-4" />
+                News API
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="locations" className="flex-1 overflow-hidden flex flex-col gap-6 mt-4">
@@ -437,11 +462,13 @@ export function SettingsModal({ open, onOpenChange, onLocationsChanged }: Settin
           </div>
           </TabsContent>
 
-          <TabsContent value="news-api" className="flex-1 overflow-hidden flex flex-col mt-4">
-            <div className="flex-1 overflow-auto">
-              <NewsAPIAdmin />
-            </div>
-          </TabsContent>
+          {showNewsAPITab && (
+            <TabsContent value="news-api" className="flex-1 overflow-hidden flex flex-col mt-4">
+              <div className="flex-1 overflow-auto">
+                <NewsAPIAdmin />
+              </div>
+            </TabsContent>
+          )}
         </Tabs>
 
         <DialogFooter className="gap-2 mt-4">

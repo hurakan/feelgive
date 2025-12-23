@@ -62,7 +62,7 @@ class GeminiService {
   /**
    * Constructs the system prompt with article context and guidelines
    */
-  private constructSystemPrompt(context: ArticleContext, webSearchResults?: string): string {
+  private constructSystemPrompt(context: ArticleContext, webSearchResults?: string, webSearchAttempted: boolean = false): string {
     const charitiesList = context.matchedCharities
       .map(charity => `- ${charity.name}: ${charity.description} (Trust Score: ${charity.trustScore})`)
       .join('\n');
@@ -97,7 +97,7 @@ ${webSearchResults}
 ` : ''}
 GUIDELINES:
 1. BREVITY: Keep responses concise (2-4 paragraphs max). Be direct and focused. Avoid lengthy explanations unless specifically asked.
-2. ACCURACY: Prioritize information from the provided Article Content. ${webSearchResults ? 'Use the web search results above to provide current information when relevant.' : 'If the user asks for information beyond the article (like latest updates), let them know they can enable web search for more current information.'} Do not make up facts.
+2. ACCURACY: Prioritize information from the provided Article Content. ${webSearchResults ? 'Use the web search results above to provide current, up-to-date information. You have access to recent web search results, so answer questions about current developments, latest updates, and recent news confidently using these sources.' : webSearchAttempted ? 'Web search was attempted but no additional results were found. Answer based on the article content and your general knowledge. If you can provide helpful information about current events or general context related to the crisis, do so confidently. Only mention the article age if you truly cannot answer the question.' : 'Focus on the article content provided. If asked about very recent developments or information not in the article, politely explain that you are working with the article information and suggest they enable web search for the most current updates.'} Do not make up facts.
 3. EMPATHY: Use a compassionate, serious, but hopeful tone.
 4. ACTION-ORIENTED: When appropriate, subtly mention how the matched charities can help with the specific needs mentioned in the article.
 5. FORMAT: Use Markdown. Keep responses focused and relevant. Always complete your sentences - never end mid-sentence.
@@ -173,7 +173,7 @@ GUIDELINES:
       }
 
       // Construct the system prompt
-      const systemPrompt = this.constructSystemPrompt(context, webSearchResults);
+      const systemPrompt = this.constructSystemPrompt(context, webSearchResults, enableWebSearch);
 
       // Build the conversation history for Gemini
       const chatHistory = history.map(msg => ({

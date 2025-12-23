@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { RefreshCw, ExternalLink, Newspaper, AlertCircle } from 'lucide-react';
 import { NewsArticle, TrackedLocation } from '@/types';
 import { getTrackedLocations } from '@/utils/tracked-locations';
-import { fetchNewsForLocation, clearNewsCache } from '@/utils/news-api';
+import { fetchNewsFromBackend, clearBackendNewsCache } from '@/utils/backend-news-api';
 import { getEventTagColor } from '@/utils/news-classifier';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -43,8 +43,8 @@ export function NewsFeed({ onArticleClick }: NewsFeedProps) {
       const newsMap = new Map<string, NewsArticle[]>();
 
       for (const location of trackedLocations) {
-        // Pass forceRefresh=true when refreshing to get new articles
-        const articles = await fetchNewsForLocation(location, 5, refresh);
+        // Fetch from backend news aggregation system
+        const articles = await fetchNewsFromBackend(location, 5, refresh);
         newsMap.set(location.id, articles);
       }
 
@@ -55,7 +55,7 @@ export function NewsFeed({ onArticleClick }: NewsFeedProps) {
       }
     } catch (error) {
       console.error('Error loading news:', error);
-      toast.error('Failed to load news');
+      toast.error('Failed to load news. Make sure news sources are configured in Settings.');
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -99,19 +99,25 @@ export function NewsFeed({ onArticleClick }: NewsFeedProps) {
 
   return (
     <div className="space-y-6">
-      {/* Refresh Button */}
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold">Your News Feed</h2>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleRefresh}
-          disabled={isRefreshing}
-          className="gap-2"
-        >
-          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
+      {/* Header with Refresh Button */}
+      <div className="space-y-2">
+        <div className="flex justify-between items-center">
+          <h2 className="text-xl font-semibold">Your News Feed</h2>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Stay informed about crises in locations you care about. Click any article to analyze it and find matching charities.
+          <span className="font-medium"> Configure news sources and track locations in Settings</span> to personalize your feed.
+        </p>
       </div>
 
       {/* News by Location */}
