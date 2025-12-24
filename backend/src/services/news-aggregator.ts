@@ -1,6 +1,7 @@
 import axios from 'axios';
 import NewsArticle, { INewsArticle } from '../models/NewsArticle.js';
 import NewsAPIConfig, { INewsAPIConfig } from '../models/NewsAPIConfig.js';
+import { newsFeedCache } from './news-feed-cache.js';
 
 interface NewsAPIResponse {
   articles: any[];
@@ -12,6 +13,11 @@ interface FetchOptions {
   countries?: string[];
   limit?: number;
   forceRefresh?: boolean;
+  region?: string;
+  locale?: string;
+  category?: string;
+  sort?: string;
+  page?: number;
 }
 
 /**
@@ -26,9 +32,74 @@ export class NewsAggregatorService {
   ];
 
   /**
-   * Fetch news from all enabled sources
+   * Fetch news from all enabled sources with caching
    */
-  async fetchFromAllSources(options: FetchOptions = {}): Promise<INewsArticle[]> {
+  async fetchFromAllSources(options: FetchOptions = {}): Promise<{
+    articles: INewsArticle[];
+    fromCache: boolean;
+    isStale: boolean;
+    dataSource: string;
+  }> {
+    const {
+      region = 'global',
+      locale = 'en',
+      category = 'all',
+      sort = 'publishedAt',
+      page = 1,
+      forceRefresh = false,
+    } = options;
+
+    // Check cache first (unless forcing refresh)
+    if (!forceRefresh) {
+      const cached = await newsFeedCache.get({
+        region,
+        locale,
+        category,
+        sort,
+        page,
+        keywords: options.keywords,
+      });
+
+      if (cached.data) {
+        console.log(`[NewsAggregator] Serving from cache (stale: ${cached.isStale}, source: ${cached.dataSource})`);
+        
+        // If stale and should refresh, trigger background refresh
+        if (cached.isStale && cached.shouldRefresh) {
+          console.log('[NewsAggregator] Triggering background refresh for stale cache');
+          newsFeedCache.trackRefreshStarted();
+          
+          // Background refresh (non-blocking)
+          this.fetchFreshAndCache(options).catch(error => {
+            console.error('[NewsAggregator] Background refresh failed:', error);
+            newsFeedCache.trackRefreshFailed();
+          });
+        }
+
+        return {
+          articles: cached.data,
+          fromCache: true,
+          isStale: cached.isStale,
+          dataSource: cached.dataSource || 'cache',
+        };
+      }
+    }
+
+    // Cache miss or force refresh - fetch fresh data
+    console.log('[NewsAggregator] Cache miss or force refresh, fetching fresh data');
+    const articles = await this.fetchFreshAndCache(options);
+
+    return {
+      articles,
+      fromCache: false,
+      isStale: false,
+      dataSource: 'fresh',
+    };
+  }
+
+  /**
+   * Fetch fresh data and update cache
+   */
+  private async fetchFreshAndCache(options: FetchOptions): Promise<INewsArticle[]> {
     const configs = await NewsAPIConfig.find({ isEnabled: true }).sort({ priority: -1 });
     
     if (configs.length === 0) {
@@ -37,6 +108,8 @@ export class NewsAggregatorService {
 
     const allArticles: INewsArticle[] = [];
     const errors: string[] = [];
+    let totalLLMCalls = 0;
+    let estimatedTokens = 0;
 
     for (const config of configs) {
       try {
@@ -48,6 +121,11 @@ export class NewsAggregatorService {
 
         const articles = await this.fetchFromSource(config, options);
         allArticles.push(...articles);
+
+        // Track LLM usage (if any classification/processing happens)
+        // For now, we estimate based on articles fetched
+        totalLLMCalls += 1; // One call per source
+        estimatedTokens += articles.length * 100; // Rough estimate
 
         // Update usage stats and clear any previous errors on success
         await this.updateUsageStats(config);
@@ -71,6 +149,34 @@ export class NewsAggregatorService {
 
     // Remove duplicates by URL
     const uniqueArticles = this.deduplicateArticles(allArticles);
+
+    // Cache the results
+    const {
+      region = 'global',
+      locale = 'en',
+      category = 'all',
+      sort = 'publishedAt',
+      page = 1,
+    } = options;
+
+    await newsFeedCache.set(
+      {
+        region,
+        locale,
+        category,
+        sort,
+        page,
+        keywords: options.keywords,
+      },
+      uniqueArticles.map(a => a.toObject ? a.toObject() : a),
+      {
+        llmCalls: totalLLMCalls,
+        estimatedTokens,
+      }
+    );
+
+    newsFeedCache.trackRefreshSuccess();
+    console.log(`[NewsAggregator] Cached ${uniqueArticles.length} articles (LLM calls: ${totalLLMCalls}, tokens: ${estimatedTokens})`);
 
     return uniqueArticles;
   }
@@ -142,6 +248,8 @@ export class NewsAggregatorService {
     countries: string[],
     limit: number
   ): Promise<any[]> {
+    // Use OR between different keyword phrases, but each phrase already contains AND logic
+    // e.g., "Congo disaster" OR "Congo emergency" OR "Congo crisis"
     const query = keywords.join(' OR ');
     const url = `https://newsapi.org/v2/everything?q=${encodeURIComponent(query)}&pageSize=${limit}&sortBy=publishedAt&language=en`;
     
@@ -240,6 +348,7 @@ export class NewsAggregatorService {
     keywords: string[],
     limit: number
   ): Promise<any[]> {
+    // Use OR between different keyword phrases
     const query = keywords.join(' OR ');
     const url = `https://content.guardianapis.com/search?q=${encodeURIComponent(query)}&page-size=${limit}&show-fields=all&api-key=${config.apiKey}`;
     
@@ -272,6 +381,7 @@ export class NewsAggregatorService {
     keywords: string[],
     limit: number
   ): Promise<any[]> {
+    // Use OR between different keyword phrases
     const query = keywords.join(' OR ');
     const url = `https://gnews.io/api/v4/search?q=${encodeURIComponent(query)}&lang=en&max=${limit}&apikey=${config.apiKey}`;
     

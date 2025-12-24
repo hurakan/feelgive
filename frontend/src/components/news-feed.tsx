@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { RefreshCw, ExternalLink, Newspaper, AlertCircle } from 'lucide-react';
 import { NewsArticle, TrackedLocation } from '@/types';
 import { getTrackedLocations } from '@/utils/tracked-locations';
-import { fetchNewsFromBackend, clearBackendNewsCache } from '@/utils/backend-news-api';
+import { fetchNewsFromBackend, clearBackendNewsCache, getNewsCacheMetrics } from '@/utils/backend-news-api';
 import { getEventTagColor } from '@/utils/news-classifier';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -43,7 +43,7 @@ export function NewsFeed({ onArticleClick }: NewsFeedProps) {
       const newsMap = new Map<string, NewsArticle[]>();
 
       for (const location of trackedLocations) {
-        // Fetch from backend news aggregation system
+        // Fetch from backend news aggregation system with caching
         const articles = await fetchNewsFromBackend(location, 5, refresh);
         newsMap.set(location.id, articles);
       }
@@ -51,11 +51,11 @@ export function NewsFeed({ onArticleClick }: NewsFeedProps) {
       setNewsByLocation(newsMap);
       
       if (refresh) {
-        toast.success('News refreshed with new articles');
+        toast.success('News refreshed with latest articles');
       }
     } catch (error) {
       console.error('Error loading news:', error);
-      toast.error('Failed to load news. Make sure news sources are configured in Settings.');
+      toast.error('Failed to load news. Showing cached results if available.');
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -99,7 +99,7 @@ export function NewsFeed({ onArticleClick }: NewsFeedProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header with Refresh Button */}
+      {/* Header with Refresh Button and Cache Status */}
       <div className="space-y-2">
         <div className="flex justify-between items-center">
           <h2 className="text-xl font-semibold">Your News Feed</h2>

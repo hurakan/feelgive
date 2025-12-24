@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import NewsAPIConfig from '../models/NewsAPIConfig.js';
 import NewsArticle from '../models/NewsArticle.js';
 import { newsAggregator } from '../services/news-aggregator.js';
+import { newsFeedCache } from '../services/news-feed-cache.js';
 
 const router = express.Router();
 
@@ -259,18 +260,36 @@ router.get('/usage', async (_req: Request, res: Response) => {
  */
 router.post('/fetch', async (req: Request, res: Response) => {
   try {
-    const { keywords, countries, limit } = req.body;
-    
-    const articles = await newsAggregator.fetchFromAllSources({
+    const {
       keywords,
       countries,
       limit,
-      forceRefresh: true,
+      region = 'global',
+      locale = 'en',
+      category = 'all',
+      sort = 'publishedAt',
+      page = 1,
+      forceRefresh = false,
+    } = req.body;
+    
+    const result = await newsAggregator.fetchFromAllSources({
+      keywords,
+      countries,
+      limit,
+      region,
+      locale,
+      category,
+      sort,
+      page,
+      forceRefresh,
     });
 
     res.json({
-      count: articles.length,
-      articles: articles.map(a => ({
+      count: result.articles.length,
+      fromCache: result.fromCache,
+      isStale: result.isStale,
+      dataSource: result.dataSource,
+      articles: result.articles.map(a => ({
         id: a._id,
         title: a.title,
         description: a.description,
@@ -376,6 +395,106 @@ router.get('/articles/:id', async (req: Request, res: Response) => {
     }
 
     res.json(article);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * @swagger
+ * /api/v1/news/cache/metrics:
+ *   get:
+ *     summary: Get news feed cache metrics
+ *     tags: [News]
+ *     responses:
+ *       200:
+ *         description: Cache metrics and statistics
+ */
+router.get('/cache/metrics', async (_req: Request, res: Response) => {
+  try {
+    const metrics = newsFeedCache.getMetrics();
+    res.json(metrics);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * @swagger
+ * /api/v1/news/cache/debug:
+ *   get:
+ *     summary: Get detailed cache debug information
+ *     tags: [News]
+ *     responses:
+ *       200:
+ *         description: Detailed cache information
+ */
+router.get('/cache/debug', async (_req: Request, res: Response) => {
+  try {
+    const debugInfo = newsFeedCache.getDebugInfo();
+    res.json(debugInfo);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * @swagger
+ * /api/v1/news/cache/clear:
+ *   post:
+ *     summary: Clear the news feed cache
+ *     tags: [News]
+ *     responses:
+ *       200:
+ *         description: Cache cleared successfully
+ */
+router.post('/cache/clear', async (_req: Request, res: Response) => {
+  try {
+    await newsFeedCache.clear();
+    res.json({ message: 'Cache cleared successfully' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * @swagger
+ * /api/v1/news/cache/invalidate:
+ *   post:
+ *     summary: Invalidate specific cache entry
+ *     tags: [News]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               region:
+ *                 type: string
+ *               locale:
+ *                 type: string
+ *               category:
+ *                 type: string
+ *               sort:
+ *                 type: string
+ *               page:
+ *                 type: number
+ *     responses:
+ *       200:
+ *         description: Cache entry invalidated
+ */
+router.post('/cache/invalidate', async (req: Request, res: Response) => {
+  try {
+    const { region, locale, category, sort, page } = req.body;
+    await newsFeedCache.invalidate({
+      region: region || 'global',
+      locale: locale || 'en',
+      category: category || 'all',
+      sort: sort || 'publishedAt',
+      page: page || 1,
+    });
+    res.json({ message: 'Cache entry invalidated' });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
