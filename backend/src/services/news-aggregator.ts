@@ -279,11 +279,17 @@ export class NewsAggregatorService {
       
       console.log(`[NewsData] Fetching with query: "${query}", limit: ${actualLimit}`);
       const response = await axios.get(url, {
-        timeout: 30000 // 30 second timeout
+        timeout: 60000 // Increased to 60 second timeout
       });
       console.log(`[NewsData] Success: ${response.data.results?.length || 0} articles`);
       return response.data.results || [];
     } catch (error: any) {
+      // Handle timeout errors
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        console.error(`[NewsData] Request timeout - API is slow or unresponsive`);
+        throw new Error('NewsData API timeout - service is slow or unresponsive');
+      }
+      
       // Handle 422 errors specifically - usually means invalid parameters
       if (error.response?.status === 422) {
         console.error(`[NewsData] Invalid request (422) - check query parameters. Query: "${keywords.slice(0, 5).join(' ')}"`);
@@ -294,7 +300,8 @@ export class NewsAggregatorService {
         status: error.response?.status,
         statusText: error.response?.statusText,
         data: error.response?.data,
-        message: error.message
+        message: error.message,
+        code: error.code
       });
       throw error;
     }
@@ -318,12 +325,18 @@ export class NewsAggregatorService {
       console.log(`[Currents] Fetching with query: "${query}", limit: ${actualLimit}`);
       const response = await axios.get(url, {
         headers: { 'Authorization': config.apiKey },
-        timeout: 30000 // 30 second timeout
+        timeout: 60000 // Increased to 60 second timeout
       });
 
       console.log(`[Currents] Success: ${response.data.news?.length || 0} articles`);
       return response.data.news || [];
     } catch (error: any) {
+      // Handle timeout errors
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        console.error(`[Currents] Request timeout - API is slow or unresponsive`);
+        throw new Error('Currents API timeout - service is slow or unresponsive');
+      }
+      
       // Handle 500 errors specifically - this is a server-side issue
       if (error.response?.status === 500) {
         console.error(`[Currents] Server error (500) - API is experiencing issues. This is not a configuration problem.`);
@@ -334,7 +347,8 @@ export class NewsAggregatorService {
         status: error.response?.status,
         statusText: error.response?.statusText,
         data: error.response?.data,
-        message: error.message
+        message: error.message,
+        code: error.code
       });
       throw error;
     }
