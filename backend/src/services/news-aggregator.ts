@@ -308,49 +308,74 @@ export class NewsAggregatorService {
   }
 
   /**
-   * Currents API integration
+   * Currents API integration with fallback strategy
+   * Uses latest-news endpoint (faster) with fallback to search if needed
    */
   private async fetchFromCurrents(
     config: INewsAPIConfig,
     keywords: string[],
     limit: number
   ): Promise<any[]> {
+    const actualLimit = Math.min(limit, 10);
+    
+    // Strategy 1: Try latest-news with category (fastest - ~300ms)
     try {
-      // Currents API uses + for AND, space for phrase matching
-      // Limit keywords to avoid overwhelming the API
-      const query = keywords.slice(0, 3).join('+'); // Use + for AND logic
-      const actualLimit = Math.min(limit, 10); // Reasonable limit
-      const url = `https://api.currentsapi.services/v1/search?keywords=${encodeURIComponent(query)}&language=en&page_size=${actualLimit}`;
-      
-      console.log(`[Currents] Fetching with query: "${query}", limit: ${actualLimit}`);
-      const response = await axios.get(url, {
+      console.log(`[Currents] Attempting latest-news with category (fast path)`);
+      const response = await axios.get('https://api.currentsapi.services/v1/latest-news', {
+        params: {
+          language: 'en',
+          category: 'world', // World news often includes crisis/humanitarian stories
+          page_size: actualLimit
+        },
         headers: { 'Authorization': config.apiKey },
-        timeout: 60000 // Increased to 60 second timeout
+        timeout: 30000 // 30 seconds should be plenty for latest-news
       });
-
-      console.log(`[Currents] Success: ${response.data.news?.length || 0} articles`);
+      
+      console.log(`[Currents] Success (latest-news): ${response.data.news?.length || 0} articles`);
       return response.data.news || [];
     } catch (error: any) {
-      // Handle timeout errors
-      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
-        console.error(`[Currents] Request timeout - API is slow or unresponsive`);
-        throw new Error('Currents API timeout - service is slow or unresponsive');
-      }
+      console.log(`[Currents] Latest-news failed, trying search endpoint...`);
       
-      // Handle 500 errors specifically - this is a server-side issue
-      if (error.response?.status === 500) {
-        console.error(`[Currents] Server error (500) - API is experiencing issues. This is not a configuration problem.`);
-        throw new Error('Currents API server error (500) - service temporarily unavailable');
+      // Strategy 2: Fallback to search endpoint with simplified query
+      try {
+        // Use simpler query - just one keyword for better performance
+        const query = keywords[0] || 'disaster';
+        console.log(`[Currents] Fetching with search query: "${query}"`);
+        
+        const response = await axios.get('https://api.currentsapi.services/v1/search', {
+          params: {
+            keywords: query,
+            language: 'en',
+            page_size: actualLimit
+          },
+          headers: { 'Authorization': config.apiKey },
+          timeout: 60000 // 60 seconds for search
+        });
+
+        console.log(`[Currents] Success (search): ${response.data.news?.length || 0} articles`);
+        return response.data.news || [];
+      } catch (searchError: any) {
+        // Handle timeout errors
+        if (searchError.code === 'ECONNABORTED' || searchError.message?.includes('timeout')) {
+          console.error(`[Currents] Request timeout after trying both endpoints`);
+          throw new Error('Currents API timeout - service is slow or unresponsive');
+        }
+        
+        // Handle 500 errors
+        if (searchError.response?.status === 500) {
+          console.error(`[Currents] Server error (500) - API is experiencing issues`);
+          throw new Error('Currents API server error (500) - service temporarily unavailable');
+        }
+        
+        console.error(`[Currents] Error details:`, {
+          status: searchError.response?.status,
+          statusText: searchError.response?.statusText,
+          data: searchError.response?.data,
+          message: searchError.message,
+          code: searchError.code
+        });
+        throw searchError;
       }
-      
-      console.error(`[Currents] Error details:`, {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        message: error.message,
-        code: error.code
-      });
-      throw error;
     }
   }
 
