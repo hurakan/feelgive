@@ -1,17 +1,18 @@
-import { Charity } from '@/types';
+import { Charity, RankedCharity } from '@/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { 
-  Building2, 
-  Calendar, 
-  MapPin, 
-  Globe, 
-  Target, 
-  TrendingUp, 
-  Users, 
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import {
+  Building2,
+  Calendar,
+  MapPin,
+  Globe,
+  Target,
+  TrendingUp,
+  Users,
   Award,
   ExternalLink,
   Twitter,
@@ -19,13 +20,18 @@ import {
   Instagram,
   Linkedin,
   Shield,
-  CheckCircle2
+  CheckCircle2,
+  AlertCircle,
+  Info,
+  Lightbulb,
+  Zap,
+  Heart
 } from 'lucide-react';
 import { getCauseLabel } from '@/utils/classification';
 import { getVettingLevelLabel } from '@/utils/charity-matching';
 
 interface OrganizationProfileProps {
-  charity: Charity;
+  charity: Charity | RankedCharity;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onDonate?: () => void;
@@ -33,6 +39,10 @@ interface OrganizationProfileProps {
 
 export function OrganizationProfile({ charity, open, onOpenChange, onDonate }: OrganizationProfileProps) {
   const profile = charity.profile;
+  const rankedCharity = 'recommendation_reasons' in charity ? charity as RankedCharity : null;
+  const hasRecommendationReasons = rankedCharity && rankedCharity.recommendation_reasons.length > 0;
+  const dataCompleteness = rankedCharity?.data_completeness;
+  const hasIncompleteData = dataCompleteness && dataCompleteness.completeness_score < 70;
 
   const getTrustBadgeColor = (score?: number) => {
     if (!score) return 'bg-muted text-muted-foreground';
@@ -102,8 +112,106 @@ export function OrganizationProfile({ charity, open, onOpenChange, onDonate }: O
         </DialogHeader>
 
         <div className="space-y-6">
+          {/* Data Completeness Warning */}
+          {hasIncompleteData && (
+            <Card className="border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30">
+              <CardContent className="pt-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                  <div className="space-y-2 flex-1">
+                    <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+                      Limited Information Available
+                    </p>
+                    <p className="text-xs text-amber-800 dark:text-amber-200">
+                      Some details about this organization are not available in our database.
+                      {!dataCompleteness?.has_website && ' No website link is available.'}
+                      {!dataCompleteness?.has_description && ' Detailed description is missing.'}
+                      {' '}We recommend verifying the organization independently before donating.
+                    </p>
+                    {charity.websiteUrl && (
+                      <a
+                        href={charity.websiteUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-300 hover:underline"
+                      >
+                        Visit their website for more information
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Why We Recommend This Organization */}
+          {hasRecommendationReasons && (
+            <section>
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
+                <Lightbulb className="h-4 w-4" />
+                Why We Recommend This Organization
+              </h3>
+              <Card>
+                <CardContent className="pt-6 space-y-4">
+                  <div className="space-y-3">
+                    {rankedCharity.recommendation_reasons.map((reason, idx) => {
+                      const Icon = reason.type === 'geographic' ? MapPin :
+                                   reason.type === 'cause' ? Target :
+                                   reason.type === 'trust' ? Shield :
+                                   reason.type === 'needs' ? Heart :
+                                   reason.type === 'rapid_response' ? Zap :
+                                   reason.type === 'vetting' ? Award : CheckCircle2;
+                      
+                      const strengthColor = reason.strength === 'primary' ? 'text-primary' :
+                                           reason.strength === 'secondary' ? 'text-blue-600 dark:text-blue-400' :
+                                           'text-muted-foreground';
+                      
+                      return (
+                        <div key={idx} className="flex items-start gap-3">
+                          <Icon className={`h-4 w-4 mt-0.5 flex-shrink-0 ${strengthColor}`} />
+                          <div className="space-y-1 flex-1">
+                            <p className="text-sm font-medium">{reason.label}</p>
+                            <p className="text-xs text-muted-foreground leading-relaxed">
+                              {reason.description}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  
+                  <Separator />
+                  
+                  <Accordion type="single" collapsible className="w-full">
+                    <AccordionItem value="how-ranking-works" className="border-none">
+                      <AccordionTrigger className="text-xs text-muted-foreground hover:text-foreground py-2">
+                        <div className="flex items-center gap-2">
+                          <Info className="h-3.5 w-3.5" />
+                          How this ranking works
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="text-xs text-muted-foreground space-y-2 pt-2">
+                        <p>
+                          We prioritize organizations based on three key factors:
+                        </p>
+                        <ol className="list-decimal list-inside space-y-1 ml-2">
+                          <li><strong>Geographic proximity:</strong> Organizations operating directly in or near the crisis area are ranked highest.</li>
+                          <li><strong>Cause alignment:</strong> Organizations with expertise matching the specific crisis type and identified needs.</li>
+                          <li><strong>Trust & credibility:</strong> Verified organizations with strong track records and transparency.</li>
+                        </ol>
+                        <p className="pt-2">
+                          This ensures your donation reaches organizations best positioned to make an immediate impact.
+                        </p>
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
+                </CardContent>
+              </Card>
+            </section>
+          )}
+
           {/* Identity & Basics */}
-          {profile && (
           <section>
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
               <Building2 className="h-4 w-4" />
@@ -112,40 +220,73 @@ export function OrganizationProfile({ charity, open, onOpenChange, onDonate }: O
             <Card>
               <CardContent className="pt-6 space-y-3">
                 <div className="grid grid-cols-2 gap-4 text-sm">
-                  {profile.fullLegalName && (
-                    <div>
-                      <p className="text-muted-foreground mb-1">Legal Name</p>
-                      <p className="font-medium">{profile.fullLegalName}</p>
-                    </div>
-                  )}
-                  {profile.dbaName && (
+                  {/* Legal Name - always show */}
+                  <div>
+                    <p className="text-muted-foreground mb-1">Legal Name</p>
+                    <p className="font-medium">{profile?.fullLegalName || charity.name}</p>
+                  </div>
+                  
+                  {profile?.dbaName && (
                     <div>
                       <p className="text-muted-foreground mb-1">Also Known As</p>
                       <p className="font-medium">{profile.dbaName}</p>
                     </div>
                   )}
-                  {profile.registrationNumber && (
+                  
+                  {/* Registration/EIN */}
+                  {(profile?.registrationNumber || charity.ein) && (
                     <div>
-                      <p className="text-muted-foreground mb-1">Registration</p>
-                      <p className="font-medium font-mono text-xs">{profile.registrationNumber}</p>
+                      <p className="text-muted-foreground mb-1">Registration / EIN</p>
+                      <p className="font-medium font-mono text-xs">
+                        {profile?.registrationNumber || charity.ein}
+                      </p>
                     </div>
                   )}
-                  {profile.website && (
-                    <div>
-                      <p className="text-muted-foreground mb-1">Website</p>
+                  
+                  {/* Website - with fallback */}
+                  <div>
+                    <p className="text-muted-foreground mb-1">Website</p>
+                    {(profile?.website || charity.websiteUrl) ? (
                       <a
-                        href={profile.website}
+                        href={profile?.website || charity.websiteUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-primary hover:underline flex items-center gap-1 font-medium"
                       >
                         Visit Site <ExternalLink className="h-3 w-3" />
                       </a>
+                    ) : (
+                      <p className="text-muted-foreground text-xs italic">Not available</p>
+                    )}
+                  </div>
+                  
+                  {/* Location */}
+                  {(profile?.headquarters || charity.locationAddress) && (
+                    <div className="col-span-2">
+                      <p className="text-muted-foreground mb-1">Location</p>
+                      <p className="font-medium text-xs">
+                        {profile?.headquarters || charity.locationAddress}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {/* Data Source */}
+                  {charity.dataSource && (
+                    <div className="col-span-2">
+                      <p className="text-muted-foreground mb-1">Data Source</p>
+                      <p className="text-xs">
+                        {charity.dataSource}
+                        {charity.lastUpdated && (
+                          <span className="text-muted-foreground ml-2">
+                            • Updated {new Date(charity.lastUpdated).toLocaleDateString()}
+                          </span>
+                        )}
+                      </p>
                     </div>
                   )}
                 </div>
 
-                {profile.socialLinks && Object.keys(profile.socialLinks).length > 0 && (
+                {profile?.socialLinks && Object.keys(profile.socialLinks).length > 0 && (
                   <>
                     <Separator className="my-3" />
                     <div>
@@ -173,7 +314,6 @@ export function OrganizationProfile({ charity, open, onOpenChange, onDonate }: O
               </CardContent>
             </Card>
           </section>
-          )}
 
           {/* Mission & Programs */}
           {profile && profile.missionStatement && (

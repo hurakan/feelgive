@@ -198,18 +198,22 @@ export function SettingsModal({ open, onOpenChange, onLocationsChanged }: Settin
   };
 
   const handleRemoveLocation = (id: string) => {
+    const locationToRemove = locations.find(loc => loc.id === id);
+    
     // Remove from local state (not saved yet)
-    setLocations(locations.filter(loc => loc.id !== id));
+    const updatedLocations = locations.filter(loc => loc.id !== id);
+    setLocations(updatedLocations);
+    
+    if (locationToRemove) {
+      toast.info(`Removed ${locationToRemove.displayName} (not saved yet)`);
+    }
   };
 
   const handleAccept = () => {
     try {
-      // Clear all existing locations
-      const existingLocations = getTrackedLocations();
-      existingLocations.forEach(loc => removeTrackedLocation(loc.id));
-      
-      // Save all new locations
-      locations.forEach(loc => saveTrackedLocation(loc));
+      // Directly save the current locations array to localStorage
+      // This avoids the race condition where clearing first triggers default restoration
+      localStorage.setItem('feelgive_tracked_locations', JSON.stringify(locations));
       
       // Update original locations to match current
       setOriginalLocations(locations);
@@ -411,8 +415,8 @@ export function SettingsModal({ open, onOpenChange, onLocationsChanged }: Settin
           <Separator />
 
           {/* Tracked Locations List */}
-          <div className="flex-1 overflow-hidden flex flex-col">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+          <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex-shrink-0">
               Tracked Locations ({locations.length})
             </h3>
             
@@ -426,8 +430,9 @@ export function SettingsModal({ open, onOpenChange, onLocationsChanged }: Settin
                 </div>
               </div>
             ) : (
-              <ScrollArea className="flex-1 -mx-6 px-6">
-                <div className="space-y-2 pb-4">
+              <div className="h-[300px] overflow-hidden">
+                <ScrollArea className="h-full w-full">
+                  <div className="space-y-2 pr-4">
                   {locations.map(location => (
                     <div
                       key={location.id}
@@ -456,8 +461,9 @@ export function SettingsModal({ open, onOpenChange, onLocationsChanged }: Settin
                       </Button>
                     </div>
                   ))}
-                </div>
-              </ScrollArea>
+                  </div>
+                </ScrollArea>
+              </div>
             )}
           </div>
           </TabsContent>

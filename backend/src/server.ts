@@ -15,6 +15,7 @@ import classificationsRouter from './routes/classifications.js';
 import chatRouter from './routes/chat.js';
 import organizationsRouter from './routes/organizations.js';
 import newsRouter from './routes/news.js';
+import recommendationsRouter from './routes/recommendations.js';
 
 // Load environment variables
 dotenv.config();
@@ -25,8 +26,29 @@ const API_VERSION = process.env.API_VERSION || 'v1';
 
 // Security middleware
 app.use(helmet());
+
+// CORS configuration - allow multiple frontend origins for development
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5140',
+  'http://localhost:5137',
+  'http://localhost:5138',
+  'http://localhost:5139',
+  'http://localhost:5141',
+  process.env.FRONTEND_URL
+].filter(Boolean);
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
 }));
 
@@ -96,6 +118,7 @@ app.use(`/api/${API_VERSION}/classifications`, classificationsRouter);
 app.use(`/api/${API_VERSION}/chat`, chatRouter);
 app.use(`/api/${API_VERSION}/organizations`, organizationsRouter);
 app.use(`/api/${API_VERSION}/news`, newsRouter);
+app.use(`/api/${API_VERSION}/recommendations`, recommendationsRouter);
 
 /**
  * @swagger
@@ -146,6 +169,7 @@ app.get('/', (_req, res) => {
       chat: `/api/${API_VERSION}/chat`,
       organizations: `/api/${API_VERSION}/organizations`,
       news: `/api/${API_VERSION}/news`,
+      recommendations: `/api/${API_VERSION}/recommendations`,
     },
   });
 });

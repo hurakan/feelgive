@@ -228,10 +228,18 @@ export function inferAddressedNeeds(
  * Extract country from location address
  * Handles various address formats and returns ISO country codes when possible
  */
-export function extractCountryFromAddress(locationAddress?: string): string[] {
-  if (!locationAddress) return ['USA']; // Default to USA
+export function extractCountryFromAddress(
+  locationAddress?: string,
+  name?: string,
+  description?: string
+): string[] {
+  // If no location data at all, default to Global for maximum flexibility
+  if (!locationAddress && !name && !description) {
+    return ['Global'];
+  }
   
-  const address = locationAddress.toLowerCase();
+  // Combine all text sources for analysis
+  const textToAnalyze = `${locationAddress || ''} ${name || ''} ${description || ''}`.toLowerCase();
   
   // Common country patterns
   const countryPatterns: Record<string, string[]> = {
@@ -265,21 +273,23 @@ export function extractCountryFromAddress(locationAddress?: string): string[] {
     'NIC': ['nicaragua', 'nicaraguan'],
   };
   
-  // Check for country matches
+  // Check for country matches in combined text
   for (const [code, patterns] of Object.entries(countryPatterns)) {
-    if (patterns.some(pattern => address.includes(pattern))) {
+    if (patterns.some(pattern => textToAnalyze.includes(pattern))) {
       return [code];
     }
   }
   
   // Check for "Global" or "International" indicators
-  if (address.includes('global') || address.includes('international') || 
-      address.includes('worldwide') || address.includes('multiple countries')) {
+  if (textToAnalyze.includes('global') || textToAnalyze.includes('international') ||
+      textToAnalyze.includes('worldwide') || textToAnalyze.includes('multiple countries') ||
+      textToAnalyze.includes('world') || textToAnalyze.includes('nations')) {
     return ['Global'];
   }
   
-  // Default to USA if no match found
-  return ['USA'];
+  // If we have location data but no match, default to USA
+  // If we have NO location data, default to Global for flexibility
+  return locationAddress ? ['USA'] : ['Global'];
 }
 
 /**
@@ -324,7 +334,120 @@ export function calculateTrustScore(nonprofit: EveryOrgNonprofit): number {
 }
 
 /**
+ * Filter out organizations that are clearly not relevant to humanitarian crises
+ * Returns true if the organization should be EXCLUDED
+ */
+export function isIrrelevantOrganization(nonprofit: EveryOrgNonprofit, searchTerm?: string): boolean {
+  const textToCheck = `${nonprofit.name} ${nonprofit.description} ${nonprofit.primaryCategory || ''} ${nonprofit.nteeCodeMeaning || ''}`.toLowerCase();
+  
+  // If we have a search term, filter out organizations that are clearly different entities
+  // despite having similar acronyms or partial name matches
+  if (searchTerm) {
+    const searchLower = searchTerm.toLowerCase();
+    const nameLower = nonprofit.name.toLowerCase();
+    
+    // Check for acronym confusion (e.g., "IRC" in search but org is "Irc Africa Inc" not "International Rescue Committee")
+    // If the search term is long (>20 chars) and the org name is short (<20 chars) with similar acronym, it's likely wrong
+    if (searchLower.length > 20 && nameLower.length < 20) {
+      // Extract potential acronym from search term
+      const searchWords = searchLower.split(/\s+/).filter(w => w.length > 2);
+      const searchAcronym = searchWords.map(w => w[0]).join('');
+      
+      // Check if org name contains the acronym but isn't the full organization
+      if (searchAcronym.length >= 3 && nameLower.includes(searchAcronym)) {
+        // This is likely an acronym match but different organization
+        console.log(`🚫 Filtering out potential acronym confusion: ${nonprofit.name} (searched for: ${searchTerm})`);
+        return true;
+      }
+    }
+    
+    // Filter out organizations with "Inc", "Corp", "LLC" suffixes that don't match the search intent
+    // e.g., searching for "International Rescue Committee" shouldn't return "IRC Africa Inc"
+    const corporateSuffixes = [' inc', ' corp', ' llc', ' ltd', ' co'];
+    const hasCorporateSuffix = corporateSuffixes.some(suffix => nameLower.endsWith(suffix));
+    
+    if (hasCorporateSuffix && !searchLower.includes('inc') && !searchLower.includes('corp') && !searchLower.includes('llc')) {
+      // Check if this is a partial acronym match (e.g., "IRC" in "Irc Africa Inc")
+      const searchWords = searchLower.split(/\s+/).filter(w => w.length > 2);
+      if (searchWords.length >= 3) { // Multi-word search like "International Rescue Committee"
+        const searchAcronym = searchWords.map(w => w[0]).join('');
+        const nameWords = nameLower.replace(/[^a-z\s]/g, '').split(/\s+/).filter(w => w.length > 0);
+        
+        // If org name starts with the acronym but has different words, filter it out
+        if (nameWords.length > 0 && nameWords[0] === searchAcronym) {
+          console.log(`🚫 Filtering out corporate entity with acronym match: ${nonprofit.name} (searched for: ${searchTerm})`);
+          return true;
+        }
+      }
+    }
+  }
+  
+  // Exclude animal-related organizations (NTEE code D)
+  if (nonprofit.nteeCode?.startsWith('D')) {
+    console.log(`🚫 Filtering out animal org: ${nonprofit.name} (NTEE: ${nonprofit.nteeCode})`);
+    return true;
+  }
+  
+  // Exclude organizations with animal-related keywords in name/description
+  const animalKeywords = [
+    'dog', 'dogs', 'cat', 'cats', 'pet', 'pets', 'animal', 'animals',
+    'veterinary', 'vet tech', 'wildlife', 'zoo', 'aquarium',
+    'horse', 'horses', 'livestock', 'bird', 'birds'
+  ];
+  
+  const hasAnimalKeyword = animalKeywords.some(keyword => textToCheck.includes(keyword));
+  if (hasAnimalKeyword) {
+    // Double-check: allow if it's clearly humanitarian despite animal keywords
+    const humanitarianKeywords = ['human', 'people', 'children', 'refugee', 'humanitarian', 'crisis', 'disaster'];
+    const hasHumanitarianKeyword = humanitarianKeywords.some(keyword => textToCheck.includes(keyword));
+    
+    if (!hasHumanitarianKeyword) {
+      console.log(`🚫 Filtering out animal-related org: ${nonprofit.name}`);
+      return true;
+    }
+  }
+  
+  // Exclude arts, culture, sports organizations (NTEE codes A, N)
+  if (nonprofit.nteeCode?.startsWith('A') || nonprofit.nteeCode?.startsWith('N')) {
+    console.log(`🚫 Filtering out arts/sports org: ${nonprofit.name} (NTEE: ${nonprofit.nteeCode})`);
+    return true;
+  }
+  
+  // Exclude domestic healthcare providers that aren't crisis-focused
+  // These are typically hospitals, clinics, and healthcare systems (NTEE E20-E24)
+  const domesticHealthcareKeywords = [
+    'hospital', 'clinic', 'medical center', 'health system', 'healthcare system',
+    'health center', 'medical group', 'physician', 'surgery center',
+    'urgent care', 'primary care', 'family medicine', 'pediatric clinic'
+  ];
+  
+  const hasDomesticHealthcareKeyword = domesticHealthcareKeywords.some(keyword =>
+    textToCheck.includes(keyword)
+  );
+  
+  if (hasDomesticHealthcareKeyword) {
+    // Allow if it's clearly humanitarian/crisis-focused despite healthcare keywords
+    const crisisHealthcareKeywords = [
+      'disaster', 'emergency response', 'humanitarian', 'crisis', 'refugee',
+      'international', 'global health', 'epidemic', 'pandemic', 'outbreak',
+      'conflict', 'war', 'displaced', 'relief', 'aid'
+    ];
+    const hasCrisisKeyword = crisisHealthcareKeywords.some(keyword =>
+      textToCheck.includes(keyword)
+    );
+    
+    if (!hasCrisisKeyword) {
+      console.log(`🚫 Filtering out domestic healthcare provider: ${nonprofit.name}`);
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+/**
  * Main mapping function: Convert EveryOrgNonprofit to Charity
+ * Handles missing data gracefully with fallbacks
  */
 export function mapEveryOrgToCharity(nonprofit: EveryOrgNonprofit) {
   // Get causes from multiple sources
@@ -333,8 +456,8 @@ export function mapEveryOrgToCharity(nonprofit: EveryOrgNonprofit) {
   const allCauses = [...new Set([...nteeCauses, ...descriptionCauses])];
   
   // Default to humanitarian_crisis if no causes detected
-  const causes: CauseCategory[] = allCauses.length > 0 
-    ? allCauses 
+  const causes: CauseCategory[] = allCauses.length > 0
+    ? allCauses
     : ['humanitarian_crisis'];
   
   // Get addressed needs
@@ -343,17 +466,29 @@ export function mapEveryOrgToCharity(nonprofit: EveryOrgNonprofit) {
     nonprofit.primaryCategory
   );
   
-  // Get countries
-  const countries = extractCountryFromAddress(nonprofit.locationAddress);
+  // Get countries - pass name and description for better inference
+  const countries = extractCountryFromAddress(
+    nonprofit.locationAddress,
+    nonprofit.name,
+    nonprofit.description
+  );
   
   // Calculate trust score
   const trustScore = calculateTrustScore(nonprofit);
+  
+  // Handle missing description gracefully
+  const description = nonprofit.description && nonprofit.description.trim().length > 0
+    ? nonprofit.description
+    : 'Information about this organization is being updated. Please visit their website for more details.';
+  
+  // Detect if this is a donor-advised fund or pass-through entity
+  const isDonorAdvisedFund = /\b(tr|trust|uw|fbo|fund)\b/i.test(nonprofit.name.toLowerCase());
   
   return {
     id: nonprofit.slug,
     name: nonprofit.name,
     slug: nonprofit.slug,
-    description: nonprofit.description,
+    description,
     logo: nonprofit.logoUrl || '/placeholder.svg',
     causes,
     countries,
@@ -363,5 +498,57 @@ export function mapEveryOrgToCharity(nonprofit: EveryOrgNonprofit) {
     geographicFlexibility: countries.includes('Global') ? 10 : 8,
     addressedNeeds,
     everyOrgVerified: true,
+    websiteUrl: nonprofit.websiteUrl,
+    ein: nonprofit.ein,
+    nteeCode: nonprofit.nteeCode,
+    locationAddress: nonprofit.locationAddress,
+    dataSource: 'Every.org',
+    lastUpdated: new Date().toISOString(),
+    // Add metadata for transparency
+    profile: isDonorAdvisedFund ? {
+      fullLegalName: nonprofit.name,
+      registrationNumber: nonprofit.ein || 'Not available',
+      yearFounded: 0,
+      headquarters: nonprofit.locationAddress || 'Not specified',
+      website: nonprofit.websiteUrl || '',
+      missionStatement: 'This entry may represent a donor-advised fund or pass-through entity benefiting another organization. Please verify the beneficiary organization before donating.',
+      programAreas: [],
+      regionsServed: countries,
+      recentHighlights: [],
+      impactMetrics: [],
+      partnerships: [],
+    } : undefined,
+  };
+}
+
+/**
+ * Calculate data completeness score for an organization
+ * Returns a score from 0-100 indicating how complete the data is
+ */
+export function calculateDataCompleteness(nonprofit: EveryOrgNonprofit): {
+  has_description: boolean;
+  has_website: boolean;
+  has_location: boolean;
+  has_ein: boolean;
+  completeness_score: number;
+} {
+  const has_description = Boolean(nonprofit.description && nonprofit.description.trim().length > 50);
+  const has_website = Boolean(nonprofit.websiteUrl);
+  const has_location = Boolean(nonprofit.locationAddress);
+  const has_ein = Boolean(nonprofit.ein);
+  
+  // Calculate weighted score
+  let score = 0;
+  if (has_description) score += 40; // Description is most important
+  if (has_website) score += 30; // Website is very important
+  if (has_location) score += 15; // Location is helpful
+  if (has_ein) score += 15; // EIN adds credibility
+  
+  return {
+    has_description,
+    has_website,
+    has_location,
+    has_ein,
+    completeness_score: score,
   };
 }

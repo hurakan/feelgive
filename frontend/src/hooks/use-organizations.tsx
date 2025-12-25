@@ -2,13 +2,14 @@ import { useState, useEffect, useCallback } from 'react';
 import { Charity, EveryOrgNonprofit } from '@/types';
 import { apiClient } from '@/utils/api-client';
 import { VERIFIED_CHARITIES as fallbackCharities } from '@/data/charities-verified';
-import { mapEveryOrgToCharity } from '@/utils/every-org-mapper';
+import { mapEveryOrgToCharity, isIrrelevantOrganization } from '@/utils/every-org-mapper';
+import { reRankOrganizations, shouldFilterBySearchContext } from '@/utils/organization-ranking';
 
 interface UseOrganizationsResult {
   organizations: Charity[];
   loading: boolean;
   error: string | null;
-  refetch: (searchTerm?: string) => Promise<void>;
+  refetch: (searchTerm?: string) => Promise<Charity[]>;
 }
 
 /**
@@ -71,9 +72,10 @@ export function useOrganizations(searchTerm?: string, fetchOnMount: boolean = tr
     // Check cache first
     if (cache.has(cacheKey)) {
       console.log('✅ useOrganizations: Using cached data');
-      setOrganizations(cache.get(cacheKey)!);
+      const cachedData = cache.get(cacheKey)!;
+      setOrganizations(cachedData);
       setLoading(false);
-      return;
+      return cachedData;
     }
 
     console.log('📡 useOrganizations: Fetching from API...');
@@ -86,18 +88,45 @@ export function useOrganizations(searchTerm?: string, fetchOnMount: boolean = tr
 
       if (response.success && response.data) {
         const responseData = response.data as any;
-        const orgs = Array.isArray(responseData)
-          ? responseData
-          : (responseData.organizations || []);
+        // Backend returns { success, count, organizations }
+        const orgs = responseData.organizations || [];
         
         console.log(`✅ useOrganizations: Received ${orgs.length} organizations from API`);
         
-        const mappedOrgs = orgs.map((org: OrganizationApiResponse) => mapApiResponseToCharity(org));
+        // Convert to EveryOrgNonprofit format for filtering and ranking
+        const everyOrgOrgs = orgs.map((org: OrganizationApiResponse): EveryOrgNonprofit => ({
+          slug: org.slug,
+          name: org.name,
+          description: org.description,
+          logoUrl: org.logoUrl,
+          coverImageUrl: org.coverImageUrl,
+          websiteUrl: org.websiteUrl,
+          ein: org.ein,
+          locationAddress: org.locationAddress || org.location,
+          primaryCategory: org.primaryCategory,
+          nteeCode: org.nteeCode,
+          nteeCodeMeaning: org.nteeCodeMeaning,
+        }));
+        
+        // Filter out irrelevant organizations
+        const relevantOrgs = everyOrgOrgs.filter(org =>
+          !isIrrelevantOrganization(org, search) &&
+          !shouldFilterBySearchContext(org, search || '')
+        );
+        
+        console.log(`✅ useOrganizations: ${relevantOrgs.length} relevant organizations after filtering (removed ${orgs.length - relevantOrgs.length})`);
+        
+        // Re-rank organizations by relevance if we have a search term
+        const rankedOrgs = search ? reRankOrganizations(relevantOrgs, search) : relevantOrgs;
+        
+        // Map to Charity type
+        const mappedOrgs = rankedOrgs.map((org: EveryOrgNonprofit) => mapEveryOrgToCharity(org));
         
         // Update cache
         setCache(prev => new Map(prev).set(cacheKey, mappedOrgs));
         setOrganizations(mappedOrgs);
         console.log(`✅ useOrganizations: Set ${mappedOrgs.length} organizations in state`);
+        return mappedOrgs;
       } else {
         throw new Error(response.error || 'Failed to fetch organizations');
       }
@@ -109,13 +138,14 @@ export function useOrganizations(searchTerm?: string, fetchOnMount: boolean = tr
       console.log('⚠️ useOrganizations: Falling back to hardcoded charity data');
       setOrganizations(fallbackCharities);
       console.log(`⚠️ useOrganizations: Set ${fallbackCharities.length} fallback charities in state`);
+      return fallbackCharities;
     } finally {
       setLoading(false);
       console.log('✅ useOrganizations: Loading complete');
     }
   }, [cache]);
 
-  const refetch = useCallback(async (search?: string) => {
+  const refetch = useCallback(async (search?: string): Promise<Charity[]> => {
     // Clear cache for this search term
     const cacheKey = search || 'all';
     setCache(prev => {
@@ -124,8 +154,73 @@ export function useOrganizations(searchTerm?: string, fetchOnMount: boolean = tr
       return newCache;
     });
     
-    await fetchOrganizations(search);
-  }, [fetchOrganizations]);
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await apiClient.searchOrganizations(search);
+      console.log('📡 refetch: API response:', { success: response.success, hasData: !!response.data, error: response.error });
+
+      if (response.success && response.data) {
+        const responseData = response.data as any;
+        // Backend returns { success, count, organizations }
+        const orgs = responseData.organizations || [];
+        
+        console.log(`✅ refetch: Received ${orgs.length} organizations from API`);
+        
+        // Convert to EveryOrgNonprofit format for filtering and ranking
+        const everyOrgOrgs = orgs.map((org: OrganizationApiResponse): EveryOrgNonprofit => ({
+          slug: org.slug,
+          name: org.name,
+          description: org.description,
+          logoUrl: org.logoUrl,
+          coverImageUrl: org.coverImageUrl,
+          websiteUrl: org.websiteUrl,
+          ein: org.ein,
+          locationAddress: org.locationAddress || org.location,
+          primaryCategory: org.primaryCategory,
+          nteeCode: org.nteeCode,
+          nteeCodeMeaning: org.nteeCodeMeaning,
+        }));
+        
+        // Filter out irrelevant organizations
+        const relevantOrgs = everyOrgOrgs.filter(org =>
+          !isIrrelevantOrganization(org, search) &&
+          !shouldFilterBySearchContext(org, search || '')
+        );
+        
+        console.log(`✅ refetch: ${relevantOrgs.length} relevant organizations after filtering (removed ${orgs.length - relevantOrgs.length})`);
+        
+        // Re-rank organizations by relevance if we have a search term
+        const rankedOrgs = search ? reRankOrganizations(relevantOrgs, search) : relevantOrgs;
+        
+        // Map to Charity type
+        const mappedOrgs = rankedOrgs.map((org: EveryOrgNonprofit) => mapEveryOrgToCharity(org));
+        
+        // Update cache
+        setCache(prev => new Map(prev).set(cacheKey, mappedOrgs));
+        setOrganizations(mappedOrgs);
+        console.log(`✅ refetch: Set ${mappedOrgs.length} organizations in state`);
+        
+        return mappedOrgs;
+      } else {
+        throw new Error(response.error || 'Failed to fetch organizations');
+      }
+    } catch (err) {
+      console.error('❌ refetch: Error fetching organizations:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch organizations');
+      
+      // Fall back to hardcoded data
+      console.log('⚠️ refetch: Falling back to hardcoded charity data');
+      setOrganizations(fallbackCharities);
+      console.log(`⚠️ refetch: Set ${fallbackCharities.length} fallback charities in state`);
+      
+      return fallbackCharities;
+    } finally {
+      setLoading(false);
+      console.log('✅ refetch: Loading complete');
+    }
+  }, []);
 
   useEffect(() => {
     if (fetchOnMount) {
@@ -163,8 +258,27 @@ export function useOrganization(slug: string) {
         const response = await apiClient.getOrganizationBySlug(slug);
 
         if (response.success && response.data) {
-          const org = response.data as OrganizationApiResponse;
-          const mappedOrg = mapApiResponseToCharity(org);
+          const responseData = response.data as any;
+          // Backend returns { success, organization }
+          const org = responseData.organization as OrganizationApiResponse;
+          
+          // Convert to EveryOrgNonprofit format
+          const everyOrgData: EveryOrgNonprofit = {
+            slug: org.slug,
+            name: org.name,
+            description: org.description,
+            logoUrl: org.logoUrl,
+            coverImageUrl: org.coverImageUrl,
+            websiteUrl: org.websiteUrl,
+            ein: org.ein,
+            locationAddress: org.locationAddress || org.location,
+            primaryCategory: org.primaryCategory,
+            nteeCode: org.nteeCode,
+            nteeCodeMeaning: org.nteeCodeMeaning,
+          };
+          
+          // Map to Charity type
+          const mappedOrg = mapEveryOrgToCharity(everyOrgData);
           setOrganization(mappedOrg);
         } else {
           throw new Error(response.error || 'Organization not found');

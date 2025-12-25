@@ -2,19 +2,74 @@ import { TrackedLocation } from '@/types';
 
 const STORAGE_KEY = 'feelgive_tracked_locations';
 
+// Default locations to show news immediately
+const DEFAULT_LOCATIONS: TrackedLocation[] = [
+  {
+    id: 'default_ukraine',
+    type: 'country',
+    value: 'Ukraine',
+    displayName: 'Ukraine',
+    createdAt: Date.now()
+  },
+  {
+    id: 'default_middle_east',
+    type: 'region',
+    value: 'Middle East',
+    displayName: 'Middle East',
+    createdAt: Date.now()
+  },
+  {
+    id: 'default_africa',
+    type: 'region',
+    value: 'Africa',
+    displayName: 'Africa',
+    createdAt: Date.now()
+  }
+];
+
 export function getTrackedLocations(): TrackedLocation[] {
   const stored = localStorage.getItem(STORAGE_KEY);
-  if (!stored) return [];
+  
+  // If no stored locations, initialize with defaults
+  if (!stored) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_LOCATIONS));
+    return DEFAULT_LOCATIONS;
+  }
   
   try {
-    return JSON.parse(stored);
+    const locations = JSON.parse(stored);
+    // If empty array, return defaults
+    if (locations.length === 0) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_LOCATIONS));
+      return DEFAULT_LOCATIONS;
+    }
+    return locations;
   } catch {
-    return [];
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_LOCATIONS));
+    return DEFAULT_LOCATIONS;
   }
 }
 
 export function saveTrackedLocation(location: TrackedLocation): void {
   const locations = getTrackedLocations();
+  
+  // Check if location already exists (prevent duplicates)
+  const isDuplicate = locations.some(loc => {
+    // For cities, check value, state, and country
+    if (location.type === 'city' && loc.type === 'city') {
+      return loc.value === location.value &&
+             loc.state === location.state &&
+             loc.country === location.country;
+    }
+    // For regions and countries, check value and type
+    return loc.value === location.value && loc.type === location.type;
+  });
+  
+  if (isDuplicate) {
+    console.warn('Location already tracked:', location.displayName);
+    return;
+  }
+  
   locations.push(location);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(locations));
 }
@@ -23,7 +78,6 @@ export function removeTrackedLocation(id: string): void {
   const locations = getTrackedLocations();
   const filtered = locations.filter(loc => loc.id !== id);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
-  console.log('Removed location. Remaining:', filtered.length);
 }
 
 export function generateLocationId(): string {

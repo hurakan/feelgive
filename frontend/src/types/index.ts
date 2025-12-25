@@ -124,6 +124,20 @@ export interface Charity {
   everyOrgVerified?: boolean; // Whether the Every.org slug has been manually verified
   geographic_tier?: number; // 1-4: Geographic relevance tier for explainability
   cause_match_level?: number; // 1-3: Cause match level for explainability
+  websiteUrl?: string; // Organization website URL
+  ein?: string; // Tax ID / EIN
+  nteeCode?: string; // NTEE classification code
+  locationAddress?: string; // Physical address
+  dataSource?: string; // Where the data came from (e.g., "Every.org", "Manual")
+  lastUpdated?: string; // When the data was last updated
+}
+
+// Recommendation reason for transparency
+export interface RecommendationReason {
+  type: 'geographic' | 'cause' | 'trust' | 'needs' | 'vetting' | 'rapid_response';
+  label: string; // Short label (e.g., "Operates in Sudan")
+  description: string; // Detailed explanation
+  strength: 'primary' | 'secondary' | 'supporting'; // Importance level
 }
 
 // Extended charity interface with ranking metadata for explainability
@@ -133,6 +147,14 @@ export interface RankedCharity extends Charity {
   geographic_tier: number; // 1-4: Direct/Regional/Global-High/Global-Low
   cause_match_level: number; // 1-3: Perfect/Category/Related
   final_rank_score: number; // Composite score for debugging
+  recommendation_reasons: RecommendationReason[]; // Detailed reasons for recommendation
+  data_completeness: {
+    has_description: boolean;
+    has_website: boolean;
+    has_location: boolean;
+    has_ein: boolean;
+    completeness_score: number; // 0-100
+  };
 }
 
 export interface Classification {

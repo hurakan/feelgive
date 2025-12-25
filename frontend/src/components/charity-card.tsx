@@ -1,15 +1,15 @@
-import { Charity } from '@/types';
+import { Charity, RankedCharity } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Shield, CheckCircle2, Award, Info } from 'lucide-react';
+import { Shield, CheckCircle2, Award, Info, MapPin, Globe, AlertCircle, ExternalLink } from 'lucide-react';
 import { getVettingLevelLabel } from '@/utils/charity-matching';
 import { useState } from 'react';
 import { OrganizationProfile } from './organization-profile';
 
 interface CharityCardProps {
-  charity: Charity;
+  charity: Charity | RankedCharity;
   onDonate: (charity: Charity) => void;
   featured?: boolean;
   isSelected?: boolean;
@@ -17,6 +17,11 @@ interface CharityCardProps {
 
 export function CharityCard({ charity, onDonate, featured = false, isSelected = false }: CharityCardProps) {
   const [showProfile, setShowProfile] = useState(false);
+  
+  // Check if this is a RankedCharity with recommendation reasons
+  const rankedCharity = 'recommendation_reasons' in charity ? charity as RankedCharity : null;
+  const primaryReasons = rankedCharity?.recommendation_reasons.filter(r => r.strength === 'primary') || [];
+  const hasIncompleteData = rankedCharity && rankedCharity.data_completeness.completeness_score < 70;
 
   const getTrustColor = (score: number) => {
     if (score >= 95) return 'from-emerald-500/20 to-emerald-500/5 border-emerald-500/30';
@@ -28,6 +33,16 @@ export function CharityCard({ charity, onDonate, featured = false, isSelected = 
     if (score >= 95) return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400';
     if (score >= 90) return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
     return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400';
+  };
+  
+  // Get primary operating region for display
+  const getPrimaryRegion = () => {
+    if (charity.countries.includes('Global')) return 'Global Operations';
+    if (charity.countries.length > 0) {
+      const country = charity.countries[0];
+      return country.length === 3 ? country : country.charAt(0).toUpperCase() + country.slice(1);
+    }
+    return 'Region not specified';
   };
 
   return (
@@ -109,18 +124,64 @@ export function CharityCard({ charity, onDonate, featured = false, isSelected = 
         </CardHeader>
         
         <CardContent className="space-y-4">
+          {/* Description with fallback handling */}
           <CardDescription className="text-sm leading-relaxed text-foreground/70">
             {charity.description}
           </CardDescription>
+          
+          {/* Primary operating region and website */}
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <div className="flex items-center gap-1.5">
+              {charity.countries.includes('Global') ? (
+                <Globe className="h-3.5 w-3.5" />
+              ) : (
+                <MapPin className="h-3.5 w-3.5" />
+              )}
+              <span>{getPrimaryRegion()}</span>
+            </div>
+            {charity.websiteUrl && (
+              <a
+                href={charity.websiteUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 hover:text-primary transition-colors"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <span>Website</span>
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+            {!charity.websiteUrl && hasIncompleteData && (
+              <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                <AlertCircle className="h-3.5 w-3.5" />
+                Limited info
+              </span>
+            )}
+          </div>
+
+          {/* Why recommended - micro-reasons */}
+          {primaryReasons.length > 0 && (
+            <div className="space-y-1.5 pt-1">
+              <p className="text-xs font-medium text-muted-foreground">Why recommended:</p>
+              <div className="space-y-1">
+                {primaryReasons.slice(0, 2).map((reason, idx) => (
+                  <div key={idx} className="flex items-start gap-1.5 text-xs">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-primary mt-0.5 flex-shrink-0" />
+                    <span className="text-foreground/80">{reason.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Single primary action button - reduced size */}
-          <Button 
-            onClick={() => onDonate(charity)} 
+          <Button
+            onClick={() => onDonate(charity)}
             className={`w-full h-9 text-sm font-medium transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] ${
-              isSelected 
-                ? 'bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 shadow-lg' 
-                : featured 
-                  ? 'bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90' 
+              isSelected
+                ? 'bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 shadow-lg'
+                : featured
+                  ? 'bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90'
                   : ''
             }`}
             variant={isSelected || featured ? 'default' : 'outline'}

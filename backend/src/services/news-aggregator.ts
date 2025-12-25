@@ -147,7 +147,7 @@ export class NewsAggregatorService {
       }
     }
 
-    // Remove duplicates by URL
+    // Remove duplicates by URL and title (more aggressive deduplication)
     const uniqueArticles = this.deduplicateArticles(allArticles);
 
     // Cache the results
@@ -249,14 +249,17 @@ export class NewsAggregatorService {
     limit: number
   ): Promise<any[]> {
     // Use OR between different keyword phrases, but each phrase already contains AND logic
-    // e.g., "Congo disaster" OR "Congo emergency" OR "Congo crisis"
+    // e.g., "Nigeria disaster" OR "Nigeria emergency" OR "Nigeria crisis"
     const query = keywords.join(' OR ');
+    console.log(`[NewsAPI] Fetching with query: "${query}"`);
+    
     const url = `https://newsapi.org/v2/everything?q=${encodeURIComponent(query)}&pageSize=${limit}&sortBy=publishedAt&language=en`;
     
     const response = await axios.get(url, {
       headers: { 'X-Api-Key': config.apiKey }
     });
 
+    console.log(`[NewsAPI] Success: ${response.data.articles?.length || 0} articles`);
     return response.data.articles || [];
   }
 
@@ -308,8 +311,8 @@ export class NewsAggregatorService {
   }
 
   /**
-   * Currents API integration with fallback strategy
-   * Uses latest-news endpoint (faster) with fallback to search if needed
+   * Currents API integration with keyword-based search
+   * Uses search endpoint with location-specific keywords for accurate filtering
    */
   private async fetchFromCurrents(
     config: INewsAPIConfig,
@@ -318,64 +321,46 @@ export class NewsAggregatorService {
   ): Promise<any[]> {
     const actualLimit = Math.min(limit, 10);
     
-    // Strategy 1: Try latest-news with category (fastest - ~300ms)
+    // Use all keywords combined with OR logic to get comprehensive results
+    // This ensures we get location-specific results for all crisis terms
+    const query = keywords.length > 0 ? keywords.join(' OR ') : 'disaster';
+    console.log(`[Currents] Fetching with search query: "${query}"`);
+    
     try {
-      console.log(`[Currents] Attempting latest-news with category (fast path)`);
-      const response = await axios.get('https://api.currentsapi.services/v1/latest-news', {
+      const response = await axios.get('https://api.currentsapi.services/v1/search', {
         params: {
+          keywords: query,
           language: 'en',
-          category: 'world', // World news often includes crisis/humanitarian stories
           page_size: actualLimit
         },
         headers: { 'Authorization': config.apiKey },
-        timeout: 30000 // 30 seconds should be plenty for latest-news
+        timeout: 60000 // 60 seconds for search
       });
-      
-      console.log(`[Currents] Success (latest-news): ${response.data.news?.length || 0} articles`);
+
+      console.log(`[Currents] Success: ${response.data.news?.length || 0} articles for query "${query}"`);
       return response.data.news || [];
     } catch (error: any) {
-      console.log(`[Currents] Latest-news failed, trying search endpoint...`);
-      
-      // Strategy 2: Fallback to search endpoint with simplified query
-      try {
-        // Use simpler query - just one keyword for better performance
-        const query = keywords[0] || 'disaster';
-        console.log(`[Currents] Fetching with search query: "${query}"`);
-        
-        const response = await axios.get('https://api.currentsapi.services/v1/search', {
-          params: {
-            keywords: query,
-            language: 'en',
-            page_size: actualLimit
-          },
-          headers: { 'Authorization': config.apiKey },
-          timeout: 60000 // 60 seconds for search
-        });
-
-        console.log(`[Currents] Success (search): ${response.data.news?.length || 0} articles`);
-        return response.data.news || [];
-      } catch (searchError: any) {
-        // Handle timeout errors
-        if (searchError.code === 'ECONNABORTED' || searchError.message?.includes('timeout')) {
-          console.error(`[Currents] Request timeout after trying both endpoints`);
-          throw new Error('Currents API timeout - service is slow or unresponsive');
-        }
-        
-        // Handle 500 errors
-        if (searchError.response?.status === 500) {
-          console.error(`[Currents] Server error (500) - API is experiencing issues`);
-          throw new Error('Currents API server error (500) - service temporarily unavailable');
-        }
-        
-        console.error(`[Currents] Error details:`, {
-          status: searchError.response?.status,
-          statusText: searchError.response?.statusText,
-          data: searchError.response?.data,
-          message: searchError.message,
-          code: searchError.code
-        });
-        throw searchError;
+      // Handle timeout errors
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        console.error(`[Currents] Request timeout for query "${query}"`);
+        throw new Error('Currents API timeout - service is slow or unresponsive');
       }
+      
+      // Handle 500 errors
+      if (error.response?.status === 500) {
+        console.error(`[Currents] Server error (500) - API is experiencing issues`);
+        throw new Error('Currents API server error (500) - service temporarily unavailable');
+      }
+      
+      console.error(`[Currents] Error details:`, {
+        query,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message,
+        code: error.code
+      });
+      throw error;
     }
   }
 
@@ -387,11 +372,14 @@ export class NewsAggregatorService {
     keywords: string[],
     limit: number
   ): Promise<any[]> {
-    // Use OR between different keyword phrases
+    // Use OR between different keyword phrases (e.g., "Nigeria disaster" OR "Nigeria emergency")
     const query = keywords.join(' OR ');
+    console.log(`[Guardian] Fetching with query: "${query}"`);
+    
     const url = `https://content.guardianapis.com/search?q=${encodeURIComponent(query)}&page-size=${limit}&show-fields=all&api-key=${config.apiKey}`;
     
     const response = await axios.get(url);
+    console.log(`[Guardian] Success: ${response.data.response?.results?.length || 0} articles`);
     return response.data.response?.results || [];
   }
 
@@ -406,9 +394,12 @@ export class NewsAggregatorService {
   ): Promise<any[]> {
     const query = keywords.join(',');
     const countryParam = countries.length > 0 ? `&countries=${countries.join(',')}` : '';
+    console.log(`[MediaStack] Fetching with keywords: "${query}"`);
+    
     const url = `http://api.mediastack.com/v1/news?access_key=${config.apiKey}&keywords=${encodeURIComponent(query)}${countryParam}&languages=en&limit=${limit}`;
     
     const response = await axios.get(url);
+    console.log(`[MediaStack] Success: ${response.data.data?.length || 0} articles`);
     return response.data.data || [];
   }
 
@@ -420,11 +411,14 @@ export class NewsAggregatorService {
     keywords: string[],
     limit: number
   ): Promise<any[]> {
-    // Use OR between different keyword phrases
+    // Use OR between different keyword phrases (e.g., "Nigeria disaster" OR "Nigeria emergency")
     const query = keywords.join(' OR ');
+    console.log(`[GNews] Fetching with query: "${query}"`);
+    
     const url = `https://gnews.io/api/v4/search?q=${encodeURIComponent(query)}&lang=en&max=${limit}&apikey=${config.apiKey}`;
     
     const response = await axios.get(url);
+    console.log(`[GNews] Success: ${response.data.articles?.length || 0} articles`);
     return response.data.articles || [];
   }
 
@@ -572,15 +566,34 @@ export class NewsAggregatorService {
   }
 
   /**
-   * Remove duplicate articles by URL
+   * Remove duplicate articles by URL and title
+   * Uses both URL and normalized title to catch duplicates from different sources
    */
   private deduplicateArticles(articles: INewsArticle[]): INewsArticle[] {
-    const seen = new Set<string>();
+    const seenUrls = new Set<string>();
+    const seenTitles = new Set<string>();
+    
     return articles.filter(article => {
-      if (seen.has(article.url)) {
+      // Normalize title for comparison (lowercase, remove extra spaces)
+      const normalizedTitle = article.title
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .trim();
+      
+      // Check if we've seen this URL or a very similar title
+      if (seenUrls.has(article.url)) {
+        console.log(`[Dedup] Skipping duplicate URL: ${article.title}`);
         return false;
       }
-      seen.add(article.url);
+      
+      if (seenTitles.has(normalizedTitle)) {
+        console.log(`[Dedup] Skipping duplicate title: ${article.title}`);
+        return false;
+      }
+      
+      // Add to seen sets
+      seenUrls.add(article.url);
+      seenTitles.add(normalizedTitle);
       return true;
     });
   }

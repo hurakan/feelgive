@@ -1,12 +1,13 @@
-import { Charity, EveryOrgNonprofit } from '@/types';
+import { Charity, RankedCharity, EveryOrgNonprofit } from '@/types';
 import { apiClient } from './api-client';
 
 /**
  * Verifies a list of charities against the backend API.
  * For each charity, it searches the Every.org database via our backend
  * and updates the charity object with verified details if found.
+ * Preserves RankedCharity metadata if present.
  */
-export async function verifyCharitiesWithBackend(charities: Charity[]): Promise<Charity[]> {
+export async function verifyCharitiesWithBackend<T extends Charity>(charities: T[]): Promise<T[]> {
   console.log('🔍 Verifying charities with backend...', charities.map(c => c.name));
   
   const verifiedCharities = await Promise.all(

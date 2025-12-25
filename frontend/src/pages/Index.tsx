@@ -13,6 +13,7 @@ import { ImpactSummary } from '@/components/impact-summary';
 import { FollowUpStoryNotification } from '@/components/follow-up-story-notification';
 import { SettingsModal } from '@/components/settings-modal';
 import { NewsFeed } from '@/components/news-feed';
+import { DebugPanel } from '@/components/debug-panel';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Classification, Charity, RankedCharity, DonationFormData, Donation } from '@/types';
@@ -21,7 +22,7 @@ import { matchCharities } from '@/utils/charity-matching';
 import { fetchArticleContent, processArticleText } from '@/utils/content-fetcher';
 import { ConversationAgent, ConversationContext } from '@/utils/conversation-agent';
 import { useOrganizations } from '@/hooks/use-organizations';
-import { extractSearchTerms } from '@/utils/search-term-extractor';
+import { extractSearchTerms, getAlternativeSearchTerms } from '@/utils/search-term-extractor';
 import { verifyCharitiesWithBackend } from '@/utils/charity-verification';
 import {
   saveDonation,
@@ -31,6 +32,7 @@ import {
   generateDonationId,
   updateUserEmail
 } from '@/utils/donations';
+import { debugLogger } from '@/utils/debug-logger';
 import { Heart, History, ArrowLeft, ArrowRight, Sparkles, MessageSquare, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -48,6 +50,8 @@ export default function Index() {
   const [articleTitle, setArticleTitle] = useState<string>('');
   const [showSettings, setShowSettings] = useState(false);
   const [newsKey, setNewsKey] = useState(0);
+  const [currentCorrelationId, setCurrentCorrelationId] = useState<string | null>(null);
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
   
   const [classification, setClassification] = useState<Classification | null>(null);
   const [matchedCharities, setMatchedCharities] = useState<RankedCharity[]>([]);
@@ -100,6 +104,17 @@ export default function Index() {
         }
       }
       
+      // Toggle debug panel with Ctrl+Shift+N (or Cmd+Shift+N on Mac)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'N') {
+        e.preventDefault();
+        setShowDebugPanel(prev => !prev);
+        if (!showDebugPanel) {
+          toast.success('Debug panel enabled');
+        } else {
+          toast.info('Debug panel hidden');
+        }
+      }
+      
       if (e.key === 'Escape' && !isProcessing) {
         if (showSettings) {
           setShowSettings(false);
@@ -115,7 +130,7 @@ export default function Index() {
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [flowStep, isProcessing, showSettings]);
+  }, [flowStep, isProcessing, showSettings, showDebugPanel]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -184,6 +199,19 @@ export default function Index() {
   };
 
   const processContent = async (url: string, title: string, text: string, summary: string) => {
+    // Generate correlation ID for this pipeline execution
+    const correlationId = debugLogger.generateCorrelationId();
+    setCurrentCorrelationId(correlationId);
+    debugLogger.startTimer(correlationId);
+    
+    debugLogger.log(
+      correlationId,
+      'article_ingest_started',
+      'info',
+      'Starting article processing pipeline',
+      { url, titleLength: title.length, textLength: text.length }
+    );
+    
     setLoadingStage('analyzing');
     await new Promise(resolve => setTimeout(resolve, 800));
     
@@ -191,22 +219,40 @@ export default function Index() {
     setArticleText(text);
     setArticleTitle(title);
     
+    debugLogger.log(
+      correlationId,
+      'article_parsed_ok',
+      'info',
+      'Article content parsed successfully',
+      {
+        title,
+        source: url !== 'pasted-content' ? 'url' : 'pasted',
+        publishDate: 'N/A',
+        language: 'en',
+        detectedLocation: 'pending classification',
+        detectedCrisisType: 'pending classification'
+      }
+    );
+    
     console.log('🧠 Classifying content...', {
       url,
       title,
       textLength: text.length
     });
     
-    console.log('🔍 About to classify content with:', {
-      urlLength: url.length,
-      titleLength: title.length,
-      textLength: text.length,
-      titlePreview: title.substring(0, 100)
-    });
-    
     const result = await classifyContent(url, title, text);
     
     if (!result) {
+      debugLogger.log(
+        correlationId,
+        'pipeline_error',
+        'error',
+        'Classification failed - no crisis detected',
+        { title, textLength: text.length },
+        0,
+        'Content does not match crisis patterns'
+      );
+      
       console.error('❌ Classification returned null');
       console.log('📄 Article details:', {
         title,
@@ -216,7 +262,6 @@ export default function Index() {
       
       setFlowStep('input');
       
-      // More helpful error message
       toast.error(
         'This article doesn\'t appear to describe an active crisis requiring immediate humanitarian response. Try an article about disasters, health emergencies, or humanitarian situations.',
         { duration: 6000 }
@@ -224,6 +269,22 @@ export default function Index() {
       
       return;
     }
+
+    debugLogger.log(
+      correlationId,
+      'cause_classification_ok',
+      'info',
+      'Content classified successfully',
+      {
+        cause: result.cause,
+        tier1_crisis_type: result.tier1_crisis_type,
+        tier2_root_cause: result.tier2_root_cause,
+        detectedLocation: result.geoName,
+        detectedCrisisType: result.tier1_crisis_type,
+        confidence: result.confidence,
+        matchedKeywords: result.matchedKeywords.length
+      }
+    );
 
     console.log('✅ Classification result:', {
       cause: result.cause,
@@ -237,6 +298,16 @@ export default function Index() {
     setClassification(result);
     
     if (result.confidence < 0.50) {
+      debugLogger.log(
+        correlationId,
+        'pipeline_error',
+        'warn',
+        'Low confidence classification',
+        { confidence: result.confidence, threshold: 0.50 },
+        0,
+        'Confidence below threshold'
+      );
+      
       console.log('⚠️ Low confidence, showing uncertain state');
       setMatchedCharities([]);
       setFlowStep('uncertain');
@@ -254,21 +325,89 @@ export default function Index() {
       geoName: result.geoName,
       cause: result.cause
     });
+    
+    // Get primary search query
     const searchQuery = extractSearchTerms(result);
-    console.log(`[EVERY.ORG] 🔍 Extracted search query: "${searchQuery}"`);
+    console.log(`[EVERY.ORG] 🔍 Primary search query: "${searchQuery}"`);
+    
+    debugLogger.log(
+      correlationId,
+      'org_provider_query_started',
+      'info',
+      'Querying organization provider',
+      {
+        location: result.geoName,
+        country: result.geo,
+        causes: [result.cause],
+        keywords: searchQuery,
+        limit: 10
+      }
+    );
     
     // Fetch organizations based on classification
     setIsFetchingOrgs(true);
-    console.log('[EVERY.ORG] 📡 Fetching organizations from API with search query...');
+    console.log('[EVERY.ORG] 📡 Fetching organizations from API...');
     
+    let fetchedOrgs: Charity[] = [];
     try {
-      await refetchOrganizations(searchQuery);
-      console.log(`[EVERY.ORG] ✅ API returned ${organizations.length} organizations`);
+      // Fetch from primary search
+      fetchedOrgs = await refetchOrganizations(searchQuery);
+      console.log(`[EVERY.ORG] ✅ Primary search returned ${fetchedOrgs.length} organizations`);
+      
+      debugLogger.log(
+        correlationId,
+        'org_provider_response_received',
+        'info',
+        'Received organizations from provider',
+        {
+          query: searchQuery,
+          sampleOrgIds: fetchedOrgs.slice(0, 3).map(o => o.slug)
+        },
+        fetchedOrgs.length
+      );
+      
+      // If we got fewer than 10 organizations, try alternative searches
+      if (fetchedOrgs.length < 10) {
+        console.log('[EVERY.ORG] 🔄 Fetching from alternative searches to get more options...');
+        const alternatives = getAlternativeSearchTerms(result);
+        
+        for (const altQuery of alternatives.slice(0, 5)) { // Try up to 5 alternatives
+          if (fetchedOrgs.length >= 20) break; // Stop if we have enough
+          
+          console.log(`[EVERY.ORG] 🔍 Trying alternative: "${altQuery}"`);
+          try {
+            const altOrgs = await refetchOrganizations(altQuery);
+            console.log(`[EVERY.ORG] ✅ Alternative search returned ${altOrgs.length} organizations`);
+            
+            // Add new organizations (avoid duplicates by slug)
+            const existingSlugs = new Set(fetchedOrgs.map(o => o.slug));
+            const newOrgs = altOrgs.filter(o => !existingSlugs.has(o.slug));
+            fetchedOrgs = [...fetchedOrgs, ...newOrgs];
+            console.log(`[EVERY.ORG] 📊 Total unique organizations: ${fetchedOrgs.length}`);
+          } catch (error) {
+            console.error(`[EVERY.ORG] ❌ Error with alternative search "${altQuery}":`, error);
+          }
+        }
+      }
+      
+      console.log(`[EVERY.ORG] ✅ Final total: ${fetchedOrgs.length} organizations`);
+      
+      debugLogger.log(
+        correlationId,
+        'org_provider_response_received',
+        'info',
+        'Final organization count after alternatives',
+        {
+          totalOrgs: fetchedOrgs.length,
+          sampleOrgs: fetchedOrgs.slice(0, 3).map(o => ({ name: o.name, slug: o.slug }))
+        },
+        fetchedOrgs.length
+      );
       
       // Log first few organizations for inspection
-      if (organizations.length > 0) {
+      if (fetchedOrgs.length > 0) {
         console.log('[EVERY.ORG] Sample organizations from API:');
-        organizations.slice(0, 3).forEach((org, idx) => {
+        fetchedOrgs.slice(0, 3).forEach((org, idx) => {
           console.log(`[EVERY.ORG]   ${idx + 1}. ${org.name} (${org.slug})`);
           console.log(`[EVERY.ORG]      - Causes: ${org.causes.join(', ')}`);
           console.log(`[EVERY.ORG]      - Trust Score: ${org.trustScore}`);
@@ -277,6 +416,16 @@ export default function Index() {
         });
       }
     } catch (error) {
+      debugLogger.log(
+        correlationId,
+        'pipeline_error',
+        'error',
+        'Failed to fetch organizations from provider',
+        { error: error instanceof Error ? error.message : String(error) },
+        0,
+        'API error or network failure'
+      );
+      
       console.error('[EVERY.ORG] ❌ Error fetching organizations:', error);
       toast.error('Failed to fetch organizations, using fallback data');
     } finally {
@@ -285,22 +434,38 @@ export default function Index() {
     
     await new Promise(resolve => setTimeout(resolve, 500));
     
-    if (!result.hasMatchingCharities) {
-      console.log('⚠️ No matching charities flag set');
-      setMatchedCharities([]);
-      setFlowStep('no-charities');
-      toast.info('We detected a crisis but don\'t have matching organizations yet');
-      return;
-    }
+    debugLogger.log(
+      correlationId,
+      'org_filtering_started',
+      'info',
+      'Starting organization filtering',
+      {
+        inputCount: fetchedOrgs.length,
+        filterRules: ['relevance', 'trust_score', 'geographic_match']
+      }
+    );
     
     console.log('[EVERY.ORG] 🔍 Matching charities with classification...');
-    console.log(`[EVERY.ORG] 📊 Available organizations from API: ${organizations.length}`);
+    console.log(`[EVERY.ORG] 📊 Available organizations from API: ${fetchedOrgs.length}`);
     
     // Use API organizations if available, otherwise matchCharities will use default VERIFIED_CHARITIES
-    const availableOrgs = organizations.length > 0 ? organizations : undefined;
+    const availableOrgs = fetchedOrgs.length > 0 ? fetchedOrgs : undefined;
     console.log(`[EVERY.ORG] ✅ Using ${availableOrgs ? `${availableOrgs.length} API organizations` : 'default VERIFIED_CHARITIES fallback'}`);
     
     const charities = matchCharities(result, availableOrgs);
+    
+    debugLogger.log(
+      correlationId,
+      'org_filtering_result',
+      'info',
+      'Organizations filtered',
+      {
+        inputCount: fetchedOrgs.length,
+        outputCount: charities.length,
+        removedCount: fetchedOrgs.length - charities.length
+      },
+      charities.length
+    );
     
     console.log(`[EVERY.ORG] ✅ Matched ${charities.length} charities:`);
     charities.forEach((charity, idx) => {
@@ -313,6 +478,20 @@ export default function Index() {
     });
     
     if (charities.length === 0) {
+      debugLogger.log(
+        correlationId,
+        'pipeline_error',
+        'warn',
+        'No organizations matched after filtering',
+        {
+          inputCount: fetchedOrgs.length,
+          classification: result.cause,
+          location: result.geoName
+        },
+        0,
+        'All organizations filtered out'
+      );
+      
       console.log('⚠️ No charities matched');
       setMatchedCharities([]);
       setFlowStep('no-charities');
@@ -320,12 +499,58 @@ export default function Index() {
       return;
     }
 
+    debugLogger.log(
+      correlationId,
+      'org_ranking_started',
+      'info',
+      'Starting organization ranking',
+      {
+        count: charities.length,
+        rankingWeights: { trust_score: 0.4, relevance: 0.3, geographic: 0.3 }
+      }
+    );
+
     // Verify the matched charities with the backend
     console.log('🔍 Verifying matched charities with backend...');
     const verifiedCharities = await verifyCharitiesWithBackend(charities);
     console.log('✅ Charities verified:', verifiedCharities.map(c => `${c.name} (${c.slug})`));
     
+    debugLogger.log(
+      correlationId,
+      'org_ranking_result',
+      'info',
+      'Organizations ranked and verified',
+      {
+        finalCount: verifiedCharities.length,
+        top3OrgIds: verifiedCharities.slice(0, 3).map(c => c.slug)
+      },
+      verifiedCharities.length
+    );
+    
+    debugLogger.log(
+      correlationId,
+      'ui_render_started',
+      'info',
+      'Starting UI render with organizations',
+      { orgCount: verifiedCharities.length }
+    );
+    
     setMatchedCharities(verifiedCharities);
+    
+    debugLogger.log(
+      correlationId,
+      'ui_rendered_count',
+      'info',
+      'UI rendered successfully',
+      {
+        renderedCount: verifiedCharities.length,
+        flowStep: 'classification'
+      },
+      verifiedCharities.length
+    );
+    
+    // Log summary
+    console.log(debugLogger.getSummary(correlationId));
     
     const context: ConversationContext = {
       classification: result,
@@ -730,11 +955,14 @@ export default function Index() {
         </footer>
       </div>
 
-      <SettingsModal 
-        open={showSettings} 
+      <SettingsModal
+        open={showSettings}
         onOpenChange={setShowSettings}
         onLocationsChanged={handleLocationsChanged}
       />
+
+      {/* Debug Panel - enabled with Ctrl+Shift+N */}
+      {showDebugPanel && <DebugPanel correlationId={currentCorrelationId} />}
     </div>
   );
 }

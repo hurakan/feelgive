@@ -18,7 +18,7 @@ interface NewsFeedProps {
 export function NewsFeed({ onArticleClick }: NewsFeedProps) {
   const [locations, setLocations] = useState<TrackedLocation[]>([]);
   const [newsByLocation, setNewsByLocation] = useState<Map<string, NewsArticle[]>>(new Map());
-  const [isLoading, setIsLoading] = useState(false);
+  const [loadingLocations, setLoadingLocations] = useState<Set<string>>(new Set());
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
@@ -35,20 +35,47 @@ export function NewsFeed({ onArticleClick }: NewsFeedProps) {
 
     if (refresh) {
       setIsRefreshing(true);
-    } else {
-      setIsLoading(true);
+      // Clear existing articles when refreshing
+      setNewsByLocation(new Map());
     }
 
+    // Mark all locations as loading
+    setLoadingLocations(new Set(trackedLocations.map(loc => loc.id)));
+
     try {
-      const newsMap = new Map<string, NewsArticle[]>();
+      // Fetch articles for each location independently and update UI as they arrive
+      const fetchPromises = trackedLocations.map(async (location) => {
+        try {
+          // Fetch from backend news aggregation system with caching
+          const articles = await fetchNewsFromBackend(location, 5, refresh);
+          
+          // Update state immediately when this location's articles arrive
+          setNewsByLocation(prev => {
+            const updated = new Map(prev);
+            updated.set(location.id, articles);
+            return updated;
+          });
+          
+          // Remove this location from loading set
+          setLoadingLocations(prev => {
+            const updated = new Set(prev);
+            updated.delete(location.id);
+            return updated;
+          });
+        } catch (error) {
+          console.error(`Error loading news for ${location.displayName}:`, error);
+          
+          // Still remove from loading set even on error
+          setLoadingLocations(prev => {
+            const updated = new Set(prev);
+            updated.delete(location.id);
+            return updated;
+          });
+        }
+      });
 
-      for (const location of trackedLocations) {
-        // Fetch from backend news aggregation system with caching
-        const articles = await fetchNewsFromBackend(location, 5, refresh);
-        newsMap.set(location.id, articles);
-      }
-
-      setNewsByLocation(newsMap);
+      // Wait for all to complete
+      await Promise.all(fetchPromises);
       
       if (refresh) {
         toast.success('News refreshed with latest articles');
@@ -57,8 +84,8 @@ export function NewsFeed({ onArticleClick }: NewsFeedProps) {
       console.error('Error loading news:', error);
       toast.error('Failed to load news. Showing cached results if available.');
     } finally {
-      setIsLoading(false);
       setIsRefreshing(false);
+      setLoadingLocations(new Set());
     }
   };
 
@@ -90,8 +117,17 @@ export function NewsFeed({ onArticleClick }: NewsFeedProps) {
           <Newspaper className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
           <h3 className="text-lg font-semibold mb-2">No Locations Tracked</h3>
           <p className="text-sm text-muted-foreground mb-4">
-            Add locations in Settings to see personalized news from around the world
+            Track locations to see personalized crisis news from around the world
           </p>
+          <div className="space-y-2 text-xs text-muted-foreground">
+            <p className="font-medium">To get started:</p>
+            <ol className="list-decimal list-inside space-y-1 text-left max-w-md mx-auto">
+              <li>Click the <strong>Settings</strong> icon (⚙️) in the top right</li>
+              <li>Select a location type (Region, Country, or City)</li>
+              <li>Choose or enter a location</li>
+              <li>Click "Add Location" and then "Accept Changes"</li>
+            </ol>
+          </div>
         </CardContent>
       </Card>
     );
@@ -123,14 +159,18 @@ export function NewsFeed({ onArticleClick }: NewsFeedProps) {
       {/* News by Location */}
       {locations.map(location => {
         const articles = newsByLocation.get(location.id) || [];
+        const isLocationLoading = loadingLocations.has(location.id);
 
         return (
           <div key={location.id} className="space-y-3">
             <h3 className="text-lg font-semibold flex items-center gap-2">
               News from {location.displayName}
+              {isLocationLoading && (
+                <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />
+              )}
             </h3>
 
-            {isLoading ? (
+            {isLocationLoading && articles.length === 0 ? (
               <div className="space-y-3">
                 {[1, 2, 3].map(i => (
                   <Card key={i} className="overflow-hidden">
@@ -145,7 +185,7 @@ export function NewsFeed({ onArticleClick }: NewsFeedProps) {
                   </Card>
                 ))}
               </div>
-            ) : articles.length === 0 ? (
+            ) : articles.length === 0 && !isLocationLoading ? (
               <Card className="border-dashed">
                 <CardContent className="pt-8 pb-8 text-center">
                   <p className="text-sm text-muted-foreground">
