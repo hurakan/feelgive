@@ -2,7 +2,7 @@ import { Classification } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { getCauseLabel } from '@/utils/classification';
-import { MapPin, Users, FileText, ArrowDown } from 'lucide-react';
+import { MapPin, Users, FileText, ArrowDown, ExternalLink } from 'lucide-react';
 
 interface ClassificationResultProps {
   classification: Classification;
@@ -28,10 +28,31 @@ export function ClassificationResult({ classification, articleSummary }: Classif
               </CardTitle>
             )}
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
             <p className="text-sm leading-relaxed text-foreground/80">
               {articleSummary}
             </p>
+            
+            {/* Source Link */}
+            {classification.articleUrl && classification.articleUrl !== 'pasted-content' ? (
+              <div className="pt-2 border-t border-border/50">
+                <a
+                  href={classification.articleUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-xs text-primary hover:text-primary/80 transition-colors group"
+                >
+                  <ExternalLink className="h-3.5 w-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                  <span className="font-medium">View original article</span>
+                </a>
+              </div>
+            ) : classification.articleUrl === 'pasted-content' ? (
+              <div className="pt-2 border-t border-border/50">
+                <p className="text-xs text-muted-foreground italic">
+                  Content provided via "Paste Text" tab
+                </p>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       )}
