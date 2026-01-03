@@ -1,8 +1,9 @@
 import { Charity } from '@/types';
+import { isEveryOrgPaymentEnabled } from './feature-flags';
 
 /**
  * Every.org Integration Utilities
- * 
+ *
  * This module handles the integration with Every.org's donation platform.
  * It provides URL generation, validation, and feature flag checking.
  */
@@ -22,9 +23,10 @@ export interface EveryOrgValidationResult {
 
 /**
  * Check if Every.org payments are enabled via feature flag
+ * This checks the localStorage feature flag set in Settings (Ctrl+Shift+F)
  */
 export function isEveryOrgEnabled(): boolean {
-  return import.meta.env.VITE_ENABLE_EVERY_ORG_PAYMENTS === 'true';
+  return isEveryOrgPaymentEnabled();
 }
 
 /**

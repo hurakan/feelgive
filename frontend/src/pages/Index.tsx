@@ -748,7 +748,11 @@ export default function Index() {
                     error={fetchError}
                   />
                   
-                  <NewsFeed key={newsKey} onArticleClick={handleNewsArticleClick} />
+                  <NewsFeed
+                    key={newsKey}
+                    onArticleClick={handleNewsArticleClick}
+                    onSettingsClick={() => setShowSettings(true)}
+                  />
                 </>
               )}
 

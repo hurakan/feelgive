@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Heart, Mail, Info, HelpCircle, ExternalLink, AlertTriangle } from 'lucide-react';
 import { canDonate, getUserPreferences } from '@/utils/donations';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { MockDonationSuccess } from '@/components/mock-donation-success';
 import {
   isEveryOrgEnabled,
   validateCharityForEveryOrg,
@@ -31,6 +32,7 @@ export function DonationForm({ charity, onSubmit, onCancel, isProcessing = false
   const [error, setError] = useState<string>('');
   const [touched, setTouched] = useState({ amount: false, email: false });
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [showMockSuccess, setShowMockSuccess] = useState(false);
 
   const everyOrgEnabled = isEveryOrgEnabled();
   const charityValidation = validateCharityForEveryOrg(charity);
@@ -122,11 +124,9 @@ export function DonationForm({ charity, onSubmit, onCancel, isProcessing = false
         setIsRedirecting(false);
       }
     } else {
-      // Demo mode - use existing flow
-      onSubmit({
-        amount: finalAmount,
-        email: email.trim() || undefined,
-      });
+      // Demo mode - show mock success experience
+      // Don't call onSubmit yet - wait for user to close the dialog
+      setShowMockSuccess(true);
     }
   };
 
@@ -342,6 +342,23 @@ export function DonationForm({ charity, onSubmit, onCancel, isProcessing = false
           </div>
         </form>
       </CardContent>
+
+      <MockDonationSuccess
+        open={showMockSuccess}
+        onOpenChange={(open) => {
+          setShowMockSuccess(open);
+          // When dialog closes, submit the donation
+          if (!open && showMockSuccess) {
+            const finalAmount = customAmount ? parseFloat(customAmount) : amount;
+            onSubmit({
+              amount: finalAmount,
+              email: email.trim() || undefined,
+            });
+          }
+        }}
+        charity={charity}
+        amount={customAmount ? parseFloat(customAmount) : amount}
+      />
     </Card>
   );
 }

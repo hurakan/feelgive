@@ -284,12 +284,23 @@ router.post('/fetch', async (req: Request, res: Response) => {
       forceRefresh,
     });
 
+    // Filter for crisis articles only (classified status)
+    const crisisArticles = result.articles.filter(a => a.classificationStatus === 'classified');
+    
+    // Sort by publishedAt (most recent first)
+    crisisArticles.sort((a, b) => {
+      const dateA = new Date(a.publishedAt).getTime();
+      const dateB = new Date(b.publishedAt).getTime();
+      return dateB - dateA;
+    });
+
     res.json({
-      count: result.articles.length,
+      count: crisisArticles.length,
+      totalFetched: result.articles.length,
       fromCache: result.fromCache,
       isStale: result.isStale,
       dataSource: result.dataSource,
-      articles: result.articles.map(a => ({
+      articles: crisisArticles.map(a => ({
         id: a._id,
         title: a.title,
         description: a.description,
@@ -299,6 +310,9 @@ router.post('/fetch', async (req: Request, res: Response) => {
         apiSource: a.apiSource,
         publishedAt: a.publishedAt,
         classificationStatus: a.classificationStatus,
+        disasterType: a.disasterType,
+        // Include crisis classification for frontend
+        isCrisis: a.classificationStatus === 'classified',
       })),
     });
   } catch (error: any) {

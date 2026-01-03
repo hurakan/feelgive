@@ -8,7 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MapPin, X, Plus, Loader2, Newspaper } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { MapPin, X, Plus, Loader2, Newspaper, Flag } from 'lucide-react';
 import { NewsAPIAdmin } from '@/components/news-api-admin';
 import { TrackedLocation, LocationType } from '@/types';
 import {
@@ -23,6 +24,7 @@ import {
   getStatesForCountry
 } from '@/utils/tracked-locations';
 import { geocodeCity, isValidCity } from '@/utils/geocoding';
+import { getFeatureFlags, saveFeatureFlags, FeatureFlags } from '@/utils/feature-flags';
 import { toast } from 'sonner';
 
 interface SettingsModalProps {
@@ -44,6 +46,8 @@ export function SettingsModal({ open, onOpenChange, onLocationsChanged }: Settin
   const [hasChanges, setHasChanges] = useState(false);
   const [availableStates, setAvailableStates] = useState<string[]>([]);
   const [showNewsAPITab, setShowNewsAPITab] = useState(false);
+  const [showFeatureFlagsTab, setShowFeatureFlagsTab] = useState(false);
+  const [featureFlags, setFeatureFlags] = useState<FeatureFlags>(getFeatureFlags());
 
   // Reset state when modal opens
   useEffect(() => {
@@ -57,29 +61,42 @@ export function SettingsModal({ open, onOpenChange, onLocationsChanged }: Settin
       setAvailableStates(getStatesForCountry('US'));
       setHasChanges(false);
       setShowNewsAPITab(false); // Reset tab visibility when modal opens
+      setShowFeatureFlagsTab(false); // Reset feature flags tab visibility
+      setFeatureFlags(getFeatureFlags()); // Reload feature flags
     }
   }, [open]);
 
-  // Listen for secret key combination: Ctrl+Shift+N (or Cmd+Shift+N on Mac)
+  // Listen for secret key combinations
   useEffect(() => {
     if (!open) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Check for Ctrl+Shift+N (Windows/Linux) or Cmd+Shift+N (Mac)
+      // Ctrl+Shift+N (or Cmd+Shift+N on Mac) - Toggle News API tab
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'N') {
         e.preventDefault();
-        setShowNewsAPITab(prev => !prev); // Toggle visibility
+        setShowNewsAPITab(prev => !prev);
         if (!showNewsAPITab) {
           toast.success('News API tab unlocked');
         } else {
           toast.info('News API tab hidden');
         }
       }
+      
+      // Ctrl+Shift+F (or Cmd+Shift+F on Mac) - Toggle Feature Flags tab
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
+        e.preventDefault();
+        setShowFeatureFlagsTab(prev => !prev);
+        if (!showFeatureFlagsTab) {
+          toast.success('Feature Flags tab unlocked');
+        } else {
+          toast.info('Feature Flags tab hidden');
+        }
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [open, showNewsAPITab]);
+  }, [open, showNewsAPITab, showFeatureFlagsTab]);
 
   // Check if there are unsaved changes
   useEffect(() => {
@@ -211,9 +228,11 @@ export function SettingsModal({ open, onOpenChange, onLocationsChanged }: Settin
 
   const handleAccept = () => {
     try {
-      // Directly save the current locations array to localStorage
-      // This avoids the race condition where clearing first triggers default restoration
+      // Save locations
       localStorage.setItem('feelgive_tracked_locations', JSON.stringify(locations));
+      
+      // Save feature flags
+      saveFeatureFlags(featureFlags);
       
       // Update original locations to match current
       setOriginalLocations(locations);
@@ -260,7 +279,11 @@ export function SettingsModal({ open, onOpenChange, onLocationsChanged }: Settin
         </DialogHeader>
 
         <Tabs defaultValue="locations" className="flex-1 overflow-hidden flex flex-col">
-          <TabsList className={`grid w-full ${showNewsAPITab ? 'grid-cols-2' : 'grid-cols-1'}`}>
+          <TabsList className={`grid w-full ${
+            showNewsAPITab && showFeatureFlagsTab ? 'grid-cols-3' :
+            showNewsAPITab || showFeatureFlagsTab ? 'grid-cols-2' :
+            'grid-cols-1'
+          }`}>
             <TabsTrigger value="locations" className="flex items-center gap-2">
               <MapPin className="h-4 w-4" />
               Tracked Locations
@@ -269,6 +292,12 @@ export function SettingsModal({ open, onOpenChange, onLocationsChanged }: Settin
               <TabsTrigger value="news-api" className="flex items-center gap-2">
                 <Newspaper className="h-4 w-4" />
                 News API
+              </TabsTrigger>
+            )}
+            {showFeatureFlagsTab && (
+              <TabsTrigger value="feature-flags" className="flex items-center gap-2">
+                <Flag className="h-4 w-4" />
+                Feature Flags
               </TabsTrigger>
             )}
           </TabsList>
@@ -472,6 +501,52 @@ export function SettingsModal({ open, onOpenChange, onLocationsChanged }: Settin
             <TabsContent value="news-api" className="flex-1 overflow-hidden flex flex-col mt-4">
               <div className="flex-1 overflow-auto">
                 <NewsAPIAdmin />
+              </div>
+            </TabsContent>
+          )}
+
+          {showFeatureFlagsTab && (
+            <TabsContent value="feature-flags" className="flex-1 overflow-hidden flex flex-col mt-4">
+              <div className="space-y-6">
+                <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                  <p className="text-sm text-amber-900 dark:text-amber-100">
+                    <strong>⚠️ Developer Settings:</strong> These flags control experimental features and integrations.
+                    Changes take effect immediately but may affect app functionality.
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                    Payment Integration
+                  </h3>
+                  
+                  <div className="flex items-center justify-between p-4 rounded-lg border bg-card">
+                    <div className="space-y-1 flex-1">
+                      <Label htmlFor="every-org-payment" className="text-base font-medium cursor-pointer">
+                        Enable Every.org Payment Integration
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        When enabled, clicking "Donate" redirects to Every.org staging environment.
+                        When disabled (default), shows a mock success message instead.
+                      </p>
+                    </div>
+                    <Switch
+                      id="every-org-payment"
+                      checked={featureFlags.enableEveryOrgPayment}
+                      onCheckedChange={(checked) => {
+                        setFeatureFlags({ ...featureFlags, enableEveryOrgPayment: checked });
+                        setHasChanges(true);
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <p><strong>How to access this tab:</strong></p>
+                  <p>Press <kbd className="px-2 py-1 bg-muted rounded">Ctrl+Shift+F</kbd> (or <kbd className="px-2 py-1 bg-muted rounded">Cmd+Shift+F</kbd> on Mac) while in Settings</p>
+                </div>
               </div>
             </TabsContent>
           )}

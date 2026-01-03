@@ -2,6 +2,7 @@ import axios from 'axios';
 import NewsArticle, { INewsArticle } from '../models/NewsArticle.js';
 import NewsAPIConfig, { INewsAPIConfig } from '../models/NewsAPIConfig.js';
 import { newsFeedCache } from './news-feed-cache.js';
+import { classifyNewsArticle, getCrisisType, isCrisisArticle } from './classifier.js';
 
 interface NewsAPIResponse {
   articles: any[];
@@ -424,6 +425,7 @@ export class NewsAggregatorService {
 
   /**
    * Normalize article from different sources to our format
+   * Includes automatic crisis classification
    */
   private normalizeArticle(article: any, provider: string): Partial<INewsArticle> {
     let normalized: Partial<INewsArticle> = {
@@ -519,7 +521,37 @@ export class NewsAggregatorService {
         break;
     }
 
+    // Classify the article for crisis detection
+    const title = normalized.title || '';
+    const description = normalized.description || '';
+    const classification = classifyNewsArticle(title, description);
+    
+    if (classification) {
+      // Article is classified as a crisis
+      normalized.classificationStatus = 'classified';
+      normalized.disasterType = this.mapCrisisTypeToDisasterType(classification.type);
+      console.log(`[Classifier] Classified as ${classification.label} (confidence: ${classification.confidence.toFixed(2)}): ${title.substring(0, 60)}...`);
+    } else {
+      // Not a crisis article
+      normalized.classificationStatus = 'irrelevant';
+      console.log(`[Classifier] Not a crisis: ${title.substring(0, 60)}...`);
+    }
+
     return normalized;
+  }
+
+  /**
+   * Map crisis type to disaster type enum
+   */
+  private mapCrisisTypeToDisasterType(crisisType: string): string | undefined {
+    const mapping: Record<string, string> = {
+      'natural_disaster': 'other',
+      'health_emergency': 'health_crisis',
+      'conflict_displacement': 'conflict',
+      'climate_disaster': 'other',
+      'human_rights_violation': 'other'
+    };
+    return mapping[crisisType];
   }
 
   /**

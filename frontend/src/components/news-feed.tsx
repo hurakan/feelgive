@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { RefreshCw, ExternalLink, Newspaper, AlertCircle } from 'lucide-react';
+import { RefreshCw, ExternalLink, Newspaper, AlertCircle, Settings } from 'lucide-react';
 import { NewsArticle, TrackedLocation } from '@/types';
 import { getTrackedLocations } from '@/utils/tracked-locations';
 import { fetchNewsFromBackend, clearBackendNewsCache, getNewsCacheMetrics } from '@/utils/backend-news-api';
@@ -13,9 +13,10 @@ import { cn } from '@/lib/utils';
 
 interface NewsFeedProps {
   onArticleClick: (url: string, title: string) => void;
+  onSettingsClick?: () => void;
 }
 
-export function NewsFeed({ onArticleClick }: NewsFeedProps) {
+export function NewsFeed({ onArticleClick, onSettingsClick }: NewsFeedProps) {
   const [locations, setLocations] = useState<TrackedLocation[]>([]);
   const [newsByLocation, setNewsByLocation] = useState<Map<string, NewsArticle[]>>(new Map());
   const [loadingLocations, setLoadingLocations] = useState<Set<string>>(new Set());
@@ -152,7 +153,16 @@ export function NewsFeed({ onArticleClick }: NewsFeedProps) {
         </div>
         <p className="text-sm text-muted-foreground">
           Stay informed about crises in locations you care about. Click any article to analyze it and find matching charities.
-          <span className="font-medium"> Configure news sources and track locations in Settings</span> to personalize your feed.
+          <span className="font-medium"> Configure news sources and track locations in </span>
+          <button
+            onClick={onSettingsClick}
+            className="inline-flex items-center gap-1 font-medium text-primary hover:text-primary/80 hover:underline transition-colors"
+            aria-label="Open settings"
+          >
+            Settings
+            <Settings className="h-3.5 w-3.5" />
+          </button>
+          <span className="font-medium"> to personalize your feed.</span>
         </p>
       </div>
 
