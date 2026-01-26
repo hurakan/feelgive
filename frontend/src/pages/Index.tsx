@@ -33,6 +33,7 @@ import {
   updateUserEmail
 } from '@/utils/donations';
 import { debugLogger } from '@/utils/debug-logger';
+import analyticsTracker from '@/utils/analytics-tracker';
 import { Heart, History, ArrowLeft, ArrowRight, Sparkles, MessageSquare, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -66,6 +67,12 @@ export default function Index() {
   // Fetch organizations dynamically from backend - don't fetch on mount
   const { organizations, loading: orgsLoading, error: orgsError, refetch: refetchOrganizations } = useOrganizations(undefined, false);
   const [isFetchingOrgs, setIsFetchingOrgs] = useState(false);
+
+  // Initialize analytics tracker on mount
+  useEffect(() => {
+    analyticsTracker.initialize();
+    console.log('[Analytics] Tracker initialized in Index component');
+  }, []);
 
   // Check for shared content on mount
   useEffect(() => {

@@ -9,7 +9,8 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
-import { MapPin, X, Plus, Loader2, Newspaper, Flag } from 'lucide-react';
+import { MapPin, X, Plus, Loader2, Newspaper, Flag, BarChart3 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { NewsAPIAdmin } from '@/components/news-api-admin';
 import { TrackedLocation, LocationType } from '@/types';
 import {
@@ -35,6 +36,8 @@ interface SettingsModalProps {
 
 
 export function SettingsModal({ open, onOpenChange, onLocationsChanged }: SettingsModalProps) {
+  const navigate = useNavigate();
+  
   // Track original locations to detect changes
   const [originalLocations, setOriginalLocations] = useState<TrackedLocation[]>(getTrackedLocations());
   const [locations, setLocations] = useState<TrackedLocation[]>(getTrackedLocations());
@@ -47,6 +50,7 @@ export function SettingsModal({ open, onOpenChange, onLocationsChanged }: Settin
   const [availableStates, setAvailableStates] = useState<string[]>([]);
   const [showNewsAPITab, setShowNewsAPITab] = useState(false);
   const [showFeatureFlagsTab, setShowFeatureFlagsTab] = useState(false);
+  const [showAnalyticsTab, setShowAnalyticsTab] = useState(false);
   const [featureFlags, setFeatureFlags] = useState<FeatureFlags>(getFeatureFlags());
 
   // Reset state when modal opens
@@ -62,6 +66,7 @@ export function SettingsModal({ open, onOpenChange, onLocationsChanged }: Settin
       setHasChanges(false);
       setShowNewsAPITab(false); // Reset tab visibility when modal opens
       setShowFeatureFlagsTab(false); // Reset feature flags tab visibility
+      setShowAnalyticsTab(false); // Reset analytics tab visibility
       setFeatureFlags(getFeatureFlags()); // Reload feature flags
     }
   }, [open]);
@@ -92,11 +97,22 @@ export function SettingsModal({ open, onOpenChange, onLocationsChanged }: Settin
           toast.info('Feature Flags tab hidden');
         }
       }
+      
+      // Ctrl+Shift+A (or Cmd+Shift+A on Mac) - Toggle Analytics tab
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'A') {
+        e.preventDefault();
+        setShowAnalyticsTab(prev => !prev);
+        if (!showAnalyticsTab) {
+          toast.success('Analytics tab unlocked');
+        } else {
+          toast.info('Analytics tab hidden');
+        }
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [open, showNewsAPITab, showFeatureFlagsTab]);
+  }, [open, showNewsAPITab, showFeatureFlagsTab, showAnalyticsTab]);
 
   // Check if there are unsaved changes
   useEffect(() => {
@@ -280,8 +296,9 @@ export function SettingsModal({ open, onOpenChange, onLocationsChanged }: Settin
 
         <Tabs defaultValue="locations" className="flex-1 overflow-hidden flex flex-col">
           <TabsList className={`grid w-full ${
-            showNewsAPITab && showFeatureFlagsTab ? 'grid-cols-3' :
-            showNewsAPITab || showFeatureFlagsTab ? 'grid-cols-2' :
+            [showNewsAPITab, showFeatureFlagsTab, showAnalyticsTab].filter(Boolean).length === 3 ? 'grid-cols-4' :
+            [showNewsAPITab, showFeatureFlagsTab, showAnalyticsTab].filter(Boolean).length === 2 ? 'grid-cols-3' :
+            [showNewsAPITab, showFeatureFlagsTab, showAnalyticsTab].filter(Boolean).length === 1 ? 'grid-cols-2' :
             'grid-cols-1'
           }`}>
             <TabsTrigger value="locations" className="flex items-center gap-2">
@@ -298,6 +315,12 @@ export function SettingsModal({ open, onOpenChange, onLocationsChanged }: Settin
               <TabsTrigger value="feature-flags" className="flex items-center gap-2">
                 <Flag className="h-4 w-4" />
                 Feature Flags
+              </TabsTrigger>
+            )}
+            {showAnalyticsTab && (
+              <TabsTrigger value="analytics" className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4" />
+                Analytics
               </TabsTrigger>
             )}
           </TabsList>
@@ -546,6 +569,52 @@ export function SettingsModal({ open, onOpenChange, onLocationsChanged }: Settin
                 <div className="text-xs text-muted-foreground space-y-1">
                   <p><strong>How to access this tab:</strong></p>
                   <p>Press <kbd className="px-2 py-1 bg-muted rounded">Ctrl+Shift+F</kbd> (or <kbd className="px-2 py-1 bg-muted rounded">Cmd+Shift+F</kbd> on Mac) while in Settings</p>
+                </div>
+              </div>
+            </TabsContent>
+          )}
+
+          {showAnalyticsTab && (
+            <TabsContent value="analytics" className="flex-1 overflow-hidden flex flex-col mt-4">
+              <div className="space-y-6">
+                <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <p className="text-sm text-blue-900 dark:text-blue-100">
+                    <strong>📊 Admin Analytics:</strong> Access the full analytics dashboard to view detailed metrics, trends, and conversion funnels.
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                    Dashboard Access
+                  </h3>
+                  
+                  <div className="flex items-center justify-between p-4 rounded-lg border bg-card">
+                    <div className="space-y-1 flex-1">
+                      <Label className="text-base font-medium">
+                        Open Analytics Dashboard
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        View comprehensive analytics including user metrics, page views, sessions, and conversion funnels.
+                      </p>
+                    </div>
+                    <Button
+                      onClick={() => {
+                        onOpenChange(false);
+                        navigate('/admin/analytics');
+                      }}
+                      className="ml-4"
+                    >
+                      <BarChart3 className="mr-2 h-4 w-4" />
+                      Open Dashboard
+                    </Button>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <p><strong>How to access this tab:</strong></p>
+                  <p>Press <kbd className="px-2 py-1 bg-muted rounded">Ctrl+Shift+A</kbd> (or <kbd className="px-2 py-1 bg-muted rounded">Cmd+Shift+A</kbd> on Mac) while in Settings</p>
                 </div>
               </div>
             </TabsContent>

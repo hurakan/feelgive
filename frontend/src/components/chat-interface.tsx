@@ -11,6 +11,7 @@ import { MessageSquare, Send, Sparkles, ArrowRight, Globe, Info, AlertCircle, Ch
 import { ConversationAgent, Message } from '@/utils/conversation-agent';
 import { cn } from '@/lib/utils';
 import { CauseCategory } from '@/types';
+import { useAnalytics } from '@/hooks/use-analytics';
 
 interface ChatInterfaceProps {
   agent: ConversationAgent;
@@ -132,6 +133,7 @@ export function ChatInterface({ agent, onProceedToDonation, onBack, articleTitle
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { track } = useAnalytics();
   
   // Rate limiting: 3 seconds between requests
   const MIN_REQUEST_INTERVAL = 3000; // 3 seconds
@@ -145,7 +147,18 @@ export function ChatInterface({ agent, onProceedToDonation, onBack, articleTitle
   useEffect(() => {
     const greeting = agent.getGreeting();
     setMessages([greeting]);
-  }, []);
+
+    // Track chat opened event
+    track('chat_opened', {
+      category: 'chat',
+      metadata: {
+        articleTitle: articleTitle || 'unknown',
+        hasClassification: !!classification,
+        cause: classification?.cause,
+        location: classification?.geoName,
+      },
+    });
+  }, [track, articleTitle, classification]);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -197,6 +210,16 @@ export function ChatInterface({ agent, onProceedToDonation, onBack, articleTitle
     setMessages(prev => [...prev, userMessage]);
     setInputValue('');
     setIsTyping(true);
+
+    // Track chat message sent event
+    track('chat_message_sent', {
+      category: 'chat',
+      metadata: {
+        messageLength: text.length,
+        webSearchEnabled,
+        messageNumber: messages.filter(m => m.role === 'user').length + 1,
+      },
+    });
 
     // Get agent response
     const response = await agent.processMessage(text);

@@ -3,10 +3,22 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CheckCircle2, Home, Heart } from 'lucide-react';
+import { useAnalytics } from '@/hooks/use-analytics';
 
 export default function DonationSuccess() {
   const navigate = useNavigate();
   const [countdown, setCountdown] = useState(10);
+  const { track } = useAnalytics();
+
+  useEffect(() => {
+    // Track donation success event
+    track('donation_success', {
+      category: 'conversion',
+      metadata: {
+        timestamp: new Date().toISOString(),
+      },
+    });
+  }, [track]);
 
   useEffect(() => {
     // Auto-redirect to home after 10 seconds

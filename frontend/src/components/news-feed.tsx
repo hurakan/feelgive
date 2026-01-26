@@ -10,6 +10,7 @@ import { fetchNewsFromBackend, clearBackendNewsCache, getNewsCacheMetrics } from
 import { getEventTagColor } from '@/utils/news-classifier';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useAnalytics } from '@/hooks/use-analytics';
 
 interface NewsFeedProps {
   onArticleClick: (url: string, title: string) => void;
@@ -21,6 +22,7 @@ export function NewsFeed({ onArticleClick, onSettingsClick }: NewsFeedProps) {
   const [newsByLocation, setNewsByLocation] = useState<Map<string, NewsArticle[]>>(new Map());
   const [loadingLocations, setLoadingLocations] = useState<Set<string>>(new Set());
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const { track } = useAnalytics();
 
   useEffect(() => {
     loadNews();
@@ -81,6 +83,17 @@ export function NewsFeed({ onArticleClick, onSettingsClick }: NewsFeedProps) {
       if (refresh) {
         toast.success('News refreshed with latest articles');
       }
+
+      // Track feed loaded event
+      const totalArticles = Array.from(newsByLocation.values()).reduce((sum, articles) => sum + articles.length, 0);
+      track('feed_loaded', {
+        category: 'news',
+        metadata: {
+          locationCount: trackedLocations.length,
+          articleCount: totalArticles,
+          isRefresh: refresh,
+        },
+      });
     } catch (error) {
       console.error('Error loading news:', error);
       toast.error('Failed to load news. Showing cached results if available.');
@@ -95,6 +108,19 @@ export function NewsFeed({ onArticleClick, onSettingsClick }: NewsFeedProps) {
   };
 
   const handleArticleClick = (article: NewsArticle) => {
+    // Track article opened event
+    track('article_opened', {
+      eventName: article.title,
+      category: 'news',
+      metadata: {
+        articleId: article.id,
+        articleUrl: article.url,
+        source: article.source,
+        eventTag: article.eventTag?.type,
+        hasImage: !!article.imageUrl,
+      },
+    });
+
     onArticleClick(article.url, article.title);
   };
 

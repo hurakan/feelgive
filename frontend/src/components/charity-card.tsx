@@ -7,6 +7,7 @@ import { Shield, CheckCircle2, Award, Info, MapPin, Globe, AlertCircle, External
 import { getVettingLevelLabel } from '@/utils/charity-matching';
 import { useState } from 'react';
 import { OrganizationProfile } from './organization-profile';
+import { useAnalytics } from '@/hooks/use-analytics';
 
 interface CharityCardProps {
   charity: Charity | RankedCharity;
@@ -17,6 +18,7 @@ interface CharityCardProps {
 
 export function CharityCard({ charity, onDonate, featured = false, isSelected = false }: CharityCardProps) {
   const [showProfile, setShowProfile] = useState(false);
+  const { track } = useAnalytics();
   
   // Check if this is a RankedCharity with recommendation reasons
   const rankedCharity = 'recommendation_reasons' in charity ? charity as RankedCharity : null;
@@ -176,7 +178,23 @@ export function CharityCard({ charity, onDonate, featured = false, isSelected = 
 
           {/* Single primary action button - reduced size */}
           <Button
-            onClick={() => onDonate(charity)}
+            onClick={() => {
+              // Track donate clicked event
+              track('donate_clicked', {
+                eventName: charity.name,
+                category: 'donation',
+                metadata: {
+                  charityId: charity.id,
+                  charityName: charity.name,
+                  trustScore: charity.trustScore,
+                  vettingLevel: charity.vettingLevel,
+                  isFeatured: featured,
+                  isSelected: isSelected,
+                },
+              });
+              
+              onDonate(charity);
+            }}
             className={`w-full h-9 text-sm font-medium transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] ${
               isSelected
                 ? 'bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 shadow-lg'
