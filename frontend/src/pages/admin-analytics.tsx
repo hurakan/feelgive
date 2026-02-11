@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Activity, Users, Eye, TrendingUp, ArrowLeft, Lock, BarChart3, MousePointerClick, Clock, Newspaper, MessageCircle, Heart, ChevronDown, ChevronRight, Zap, X, Filter } from 'lucide-react';
+import { Activity, Users, Eye, TrendingUp, ArrowLeft, Lock, BarChart3, MousePointerClick, Clock, Newspaper, MessageCircle, Heart, ChevronDown, ChevronRight, Zap, X, Filter, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAnalytics } from '@/hooks/use-analytics';
 import {
@@ -36,6 +36,7 @@ export default function AdminAnalytics() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [isAuthenticated, setIsAuthenticated] = useState(hasAdminKey());
   const [adminKey, setAdminKey] = useState('');
+  const [showAdminKey, setShowAdminKey] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [isGeneratingTestData, setIsGeneratingTestData] = useState(false);
   
@@ -369,19 +370,39 @@ export default function AdminAnalytics() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="admin-key">Admin Key</Label>
-              <Input
-                id="admin-key"
-                type="password"
-                placeholder="Enter admin key"
-                value={adminKey}
-                onChange={(e) => setAdminKey(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleAuthenticate();
-                  }
-                }}
-                disabled={isAuthenticating}
-              />
+              <div className="relative">
+                <Input
+                  id="admin-key"
+                  type={showAdminKey ? "text" : "password"}
+                  placeholder="Enter admin key"
+                  value={adminKey}
+                  onChange={(e) => setAdminKey(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleAuthenticate();
+                    }
+                  }}
+                  disabled={isAuthenticating}
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowAdminKey(!showAdminKey)}
+                  disabled={isAuthenticating}
+                >
+                  {showAdminKey ? (
+                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  <span className="sr-only">
+                    {showAdminKey ? "Hide" : "Show"} admin key
+                  </span>
+                </Button>
+              </div>
             </div>
             <div className="flex gap-2">
               <Button
