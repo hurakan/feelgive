@@ -7,7 +7,8 @@
  * - Funnel conversion data
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+// Remove /api/v1 suffix since VITE_API_BASE_URL already includes it
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api/v1').replace(/\/api\/v1$/, '');
 
 export interface SummaryStats {
   totalUsers: number;
