@@ -14,8 +14,21 @@ export const isAdmin = async (req: Request, res: Response, next: NextFunction): 
     const adminHeader = req.headers['x-admin-key'];
     const adminKey = process.env.ADMIN_KEY;
 
+    // Debug logging (remove after fixing)
+    console.log('[isAdmin] Debug:', {
+      hasAdminKey: !!adminKey,
+      adminKeyLength: adminKey?.length,
+      adminKeyPreview: adminKey ? `${adminKey.substring(0, 5)}...` : 'undefined',
+      hasAdminHeader: !!adminHeader,
+      adminHeaderType: typeof adminHeader,
+      adminHeaderLength: typeof adminHeader === 'string' ? adminHeader.length : 'N/A',
+      adminHeaderPreview: typeof adminHeader === 'string' ? `${adminHeader.substring(0, 5)}...` : adminHeader,
+      matches: adminKey && adminHeader === adminKey
+    });
+
     // If admin key is set and matches, allow access
     if (adminKey && adminHeader === adminKey) {
+      console.log('[isAdmin] Access granted via admin key');
       next();
       return;
     }
