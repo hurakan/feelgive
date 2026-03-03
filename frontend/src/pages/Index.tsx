@@ -24,6 +24,7 @@ import { ConversationAgent, ConversationContext } from '@/utils/conversation-age
 import { useOrganizations } from '@/hooks/use-organizations';
 import { extractSearchTerms, getAlternativeSearchTerms } from '@/utils/search-term-extractor';
 import { verifyCharitiesWithBackend } from '@/utils/charity-verification';
+import { apiClient } from '@/utils/api-client';
 import {
   saveDonation,
   getDonations,
@@ -351,15 +352,59 @@ export default function Index() {
       }
     );
     
-    // Fetch organizations based on classification
+    // Fetch organizations using NEW geo-relevant recommendation endpoint
     setIsFetchingOrgs(true);
-    console.log('[EVERY.ORG] 📡 Fetching organizations from API...');
+    console.log('[GEO-RELEVANT] 📡 Fetching organizations from recommendation engine...');
     
     let fetchedOrgs: Charity[] = [];
     try {
-      // Fetch from primary search
-      fetchedOrgs = await refetchOrganizations(searchQuery);
-      console.log(`[EVERY.ORG] ✅ Primary search returned ${fetchedOrgs.length} organizations`);
+      // Call NEW recommendation endpoint with full article context
+      const recommendationResponse = await apiClient.getRecommendations({
+        title: title,
+        description: summary,
+        content: text,
+        url: url !== 'pasted-content' ? url : undefined,
+        entities: {
+          geography: {
+            country: result.geo,
+            region: result.geoName,
+          },
+          disasterType: result.tier1_crisis_type,
+        },
+        causes: [result.cause],
+        keywords: result.matchedKeywords,
+      });
+      
+      console.log('[GEO-RELEVANT] API response:', {
+        success: recommendationResponse.success,
+        hasData: !!recommendationResponse.data
+      });
+      
+      if (recommendationResponse.success && recommendationResponse.data) {
+        const responseData = recommendationResponse.data as any;
+        const nonprofits = responseData.nonprofits || [];
+        
+        // Convert to Charity format
+        fetchedOrgs = nonprofits.map((org: any) => ({
+          id: org.slug,
+          slug: org.slug,
+          name: org.name,
+          description: org.description || '',
+          causes: org.causes || [],
+          countries: [org.locationAddress || ''],
+          addressedNeeds: [],
+          trustScore: 85, // Default trust score
+          everyOrgVerified: true,
+          websiteUrl: org.websiteUrl,
+          logoUrl: org.logoUrl,
+        }));
+        
+        console.log(`[GEO-RELEVANT] ✅ Received ${fetchedOrgs.length} geo-filtered organizations`);
+      } else {
+        console.warn('[GEO-RELEVANT] ⚠️ No organizations returned, falling back to search');
+        // Fallback to old search if new endpoint fails
+        fetchedOrgs = await refetchOrganizations(searchQuery);
+      }
       
       debugLogger.log(
         correlationId,

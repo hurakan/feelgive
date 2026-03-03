@@ -1,0 +1,101 @@
+services:
+  # Backend API Service
+  - type: web
+    name: feelgive-backend
+    runtime: docker
+    rootDir: backend
+    plan: free  # Change to 'starter' for production (no cold starts)
+    healthCheckPath: /health
+    envVars:
+      # Server Configuration
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: API_VERSION
+        value: v1
+      
+      # MongoDB Atlas - Add via Render dashboard (sensitive)
+      - key: MONGODB_URI
+        sync: false
+      
+      # JWT Configuration - Generate secure value
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      
+      # CORS - Update after frontend deployment
+      - key: FRONTEND_URL
+        value: https://feelgive-frontend.onrender.com
+      
+      # Rate Limiting
+      - key: RATE_LIMIT_WINDOW_MS
+        value: 900000
+      - key: RATE_LIMIT_MAX_REQUESTS
+        value: 100
+      
+      # Every.org Integration - Add via Render dashboard (sensitive)
+      - key: EVERY_ORG_API_PUBLIC_KEY
+        sync: false
+      - key: DONATION_URL
+        value: staging.every.org
+      - key: REDIRECT_URL
+        value: https://feelgive-frontend.onrender.com/donation-success
+      
+      # Google Gemini (RAG Chat) - Add via Render dashboard (sensitive)
+      - key: GOOGLE_GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL_NAME
+        value: gemini-1.5-flash
+      
+      # News APIs (Optional) - Add via Render dashboard if needed
+      - key: NEWSAPI_KEY
+        sync: false
+      - key: NEWSDATA_KEY
+        sync: false
+      - key: CURRENTS_KEY
+        sync: false
+      - key: GUARDIAN_KEY
+        sync: false
+      - key: MEDIASTACK_KEY
+        sync: false
+      - key: GNEWS_KEY
+        sync: false
+      
+      # Web Search (Optional)
+      - key: WEB_SEARCH_ENABLED
+        value: false
+      - key: GOOGLE_SEARCH_API_KEY
+        sync: false
+      - key: GOOGLE_SEARCH_ENGINE_ID
+        sync: false
+      - key: WEB_SEARCH_MAX_RESULTS
+        value: 3
+      - key: WEB_SEARCH_CACHE_ENABLED
+        value: true
+
+  # Frontend Static Site
+  - type: web
+    name: feelgive-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    pullRequestPreviewsEnabled: true
+    envVars:
+      # Backend API Configuration - Update after backend deployment
+      - key: VITE_API_BASE_URL
+        value: https://feelgive-backend.onrender.com/api/v1
+      
+      # Backend Integration
+      - key: VITE_ENABLE_BACKEND
+        value: true
+      
+      # Every.org Integration
+      - key: VITE_ENABLE_EVERY_ORG_PAYMENTS
+        value: true
+      - key: VITE_DONATION_BASE_URL
+        value: staging.every.org
+      - key: VITE_REDIRECT_URL
+        value: https://feelgive-frontend.onrender.com/donation-success

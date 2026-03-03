@@ -224,19 +224,31 @@ npm run test
 
 ## 🚢 Deployment
 
+### Recommended: Render (Full-Stack)
+**Best for production deployment with Docker support**
+
+- **Quick Start**: [`RENDER_QUICK_START.md`](RENDER_QUICK_START.md) - 15-minute setup
+- **Full Guide**: [`RENDER_MIGRATION_GUIDE.md`](RENDER_MIGRATION_GUIDE.md) - Complete migration guide
+- **Comparison**: [`DEPLOYMENT_COMPARISON.md`](DEPLOYMENT_COMPARISON.md) - Platform comparison
+- **Infrastructure**: [`render.yaml`](render.yaml) - Infrastructure as code
+
+**Pricing**: Free tier available, $7/month for production (no cold starts)
+
 ### Backend Deployment Options
-1. **Vercel** (Serverless) - See [`backend/DEPLOYMENT.md`](backend/DEPLOYMENT.md)
-2. **Railway** - One-click deployment
-3. **Render** - Free tier available
-4. **Docker** - Containerized deployment
+1. **Render** (Recommended) - Docker support, free tier, $7/month production
+2. **Vercel** (Serverless) - See [`backend/DEPLOYMENT.md`](backend/DEPLOYMENT.md)
+3. **Railway** - One-click deployment, usage-based pricing
+4. **Docker** - Containerized deployment (any cloud provider)
 5. **VPS** - Traditional server deployment
 
-### Frontend Deployment
-1. **Vercel** - Recommended (already configured)
-2. **Netlify** - Alternative option
-3. **GitHub Pages** - Static hosting
+### Frontend Deployment Options
+1. **Render** (Recommended) - Free static site hosting
+2. **Vercel** - Excellent for React/Vite (already configured)
+3. **Netlify** - Alternative static hosting
+4. **GitHub Pages** - Free static hosting
 
-See deployment guides in respective README files.
+### Migration from SnapDev
+See [`RENDER_MIGRATION_GUIDE.md`](RENDER_MIGRATION_GUIDE.md) for step-by-step migration instructions.
 
 ## 🔧 Development
 

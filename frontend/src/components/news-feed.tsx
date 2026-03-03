@@ -224,8 +224,11 @@ export function NewsFeed({ onArticleClick, onSettingsClick }: NewsFeedProps) {
             ) : articles.length === 0 && !isLocationLoading ? (
               <Card className="border-dashed">
                 <CardContent className="pt-8 pb-8 text-center">
-                  <p className="text-sm text-muted-foreground">
-                    No recent news found for this location
+                  <p className="text-sm font-medium text-muted-foreground mb-1">
+                    No crisis news found
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    No active humanitarian crises are currently being reported for {location.displayName}
                   </p>
                 </CardContent>
               </Card>

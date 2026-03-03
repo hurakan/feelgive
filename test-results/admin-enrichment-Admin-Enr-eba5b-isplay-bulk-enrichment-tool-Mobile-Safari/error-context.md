@@ -1,0 +1,75 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - region "Notifications (F8)":
+    - list
+  - region "Notifications alt+T"
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e5]:
+        - heading "Enrichment Dashboard" [level=1] [ref=e6]
+        - paragraph [ref=e7]: Monitor and manage nonprofit data enrichment
+      - button "Refresh" [ref=e8] [cursor=pointer]:
+        - img
+        - text: Refresh
+    - alert [ref=e9]:
+      - img [ref=e10]
+      - generic [ref=e12]: Failed to fetch statistics
+    - generic [ref=e13]:
+      - generic [ref=e14]:
+        - generic [ref=e15]:
+          - heading "Total Enriched" [level=3] [ref=e16]
+          - img [ref=e17]
+        - generic [ref=e21]:
+          - generic [ref=e22]: "0"
+          - paragraph [ref=e23]: "% coverage"
+      - generic [ref=e24]:
+        - generic [ref=e25]:
+          - heading "IRS Records" [level=3] [ref=e26]
+          - img [ref=e27]
+        - generic [ref=e29]:
+          - generic [ref=e30]: "0"
+          - paragraph [ref=e31]: Local database
+      - generic [ref=e32]:
+        - generic [ref=e33]:
+          - heading "Cache Hit Rate" [level=3] [ref=e34]
+          - img [ref=e35]
+        - generic [ref=e38]:
+          - generic [ref=e39]: "%"
+          - paragraph [ref=e40]: "Avg: ms"
+      - generic [ref=e41]:
+        - generic [ref=e42]:
+          - heading "Quality Score" [level=3] [ref=e43]
+          - img [ref=e44]
+        - generic [ref=e46]:
+          - generic [ref=e47]: "%"
+          - paragraph [ref=e48]: Data completeness
+    - generic [ref=e49]:
+      - tablist [ref=e50]:
+        - tab "Overview" [ref=e51] [cursor=pointer]
+        - tab "Circuit Breakers" [ref=e52] [cursor=pointer]
+        - tab "Data Quality" [ref=e53] [cursor=pointer]
+        - tab "Search" [ref=e54] [cursor=pointer]
+        - tab "Admin Tools" [active] [selected] [ref=e55] [cursor=pointer]
+      - tabpanel "Admin Tools" [ref=e56]:
+        - generic [ref=e57]:
+          - generic [ref=e58]:
+            - generic [ref=e59]:
+              - heading "Import IRS BMF Data" [level=3] [ref=e60]
+              - paragraph [ref=e61]: Download and import 1.8M IRS records (30-60 min)
+            - generic [ref=e62]:
+              - button "Start IRS Import" [ref=e63] [cursor=pointer]:
+                - img
+                - text: Start IRS Import
+              - paragraph [ref=e64]: This will download the latest IRS BMF data and import it into MongoDB. Check server logs for progress.
+          - generic [ref=e65]:
+            - generic [ref=e66]:
+              - heading "Bulk Enrichment" [level=3] [ref=e67]
+              - paragraph [ref=e68]: Enrich all organizations with EINs
+            - generic [ref=e69]:
+              - button "Start Bulk Enrichment" [ref=e70] [cursor=pointer]:
+                - img
+                - text: Start Bulk Enrichment
+              - paragraph [ref=e71]: This will enrich all organizations that have EINs but haven't been enriched yet. Check server logs for progress.
+```

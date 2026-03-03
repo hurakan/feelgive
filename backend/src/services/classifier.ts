@@ -28,7 +28,8 @@ const CRISIS_PATTERNS: Record<Exclude<CrisisType, 'none'>, CrisisPattern> = {
     keywords: [
       'earthquake', 'tsunami', 'hurricane', 'tornado', 'flood', 'wildfire',
       'volcano', 'landslide', 'avalanche', 'cyclone', 'typhoon', 'storm',
-      'drought', 'blizzard', 'heatwave', 'disaster', 'emergency', 'evacuation'
+      'drought', 'blizzard', 'heatwave', 'disaster', 'emergency', 'evacuation',
+      'destroyed', 'devastation', 'damage', 'rescue', 'survivor', 'missing'
     ],
     label: 'Natural Disaster'
   },
@@ -44,7 +45,10 @@ const CRISIS_PATTERNS: Record<Exclude<CrisisType, 'none'>, CrisisPattern> = {
     keywords: [
       'war', 'conflict', 'refugee', 'displaced', 'violence', 'attack',
       'military', 'bombing', 'casualties', 'humanitarian crisis', 'asylum',
-      'migration', 'persecution', 'genocide', 'ethnic cleansing', 'civil war'
+      'migration', 'persecution', 'genocide', 'ethnic cleansing', 'civil war',
+      'killed', 'death', 'dead', 'injured', 'wounded', 'victims', 'shooting',
+      'gunmen', 'armed', 'kidnapped', 'abducted', 'hostage', 'terror', 'militant',
+      'raid', 'ambush', 'clashes', 'fighting', 'battle', 'siege'
     ],
     label: 'Conflict & Displacement'
   },
@@ -60,7 +64,8 @@ const CRISIS_PATTERNS: Record<Exclude<CrisisType, 'none'>, CrisisPattern> = {
     keywords: [
       'human rights', 'abuse', 'torture', 'discrimination', 'oppression',
       'injustice', 'violation', 'persecution', 'freedom', 'protest',
-      'demonstration', 'civil rights', 'inequality', 'exploitation'
+      'demonstration', 'civil rights', 'inequality', 'exploitation',
+      'arrested', 'detained', 'imprisoned', 'crackdown', 'repression'
     ],
     label: 'Human Rights'
   }

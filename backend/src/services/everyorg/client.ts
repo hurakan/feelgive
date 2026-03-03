@@ -11,7 +11,8 @@ export interface NonprofitCandidate {
   logoUrl?: string;
   coverImageUrl?: string;
   websiteUrl?: string;
-  locationAddress?: string;
+  location?: string; // From Search API (e.g., "LYNN, MA")
+  locationAddress?: string; // From Details API (same format)
   primaryCategory?: string;
   nteeCode?: string;
   nteeCodeMeaning?: string;
@@ -24,7 +25,7 @@ export interface NonprofitCandidate {
  */
 export interface NonprofitEnriched extends NonprofitCandidate {
   isDisbursable?: boolean;
-  location?: {
+  locationParsed?: {
     city?: string;
     state?: string;
     country?: string;
@@ -181,7 +182,8 @@ export class EveryOrgClient {
       logoUrl: org.logoUrl,
       coverImageUrl: org.coverImageUrl,
       websiteUrl: org.websiteUrl,
-      locationAddress: org.locationAddress,
+      location: org.location, // From Search API
+      locationAddress: org.locationAddress, // From Details API
       primaryCategory: org.primaryCategory,
       nteeCode: org.nteeCode,
       nteeCodeMeaning: org.nteeCodeMeaning,
@@ -199,7 +201,7 @@ export class EveryOrgClient {
     return {
       ...base,
       isDisbursable: data.isDisbursable,
-      location: this.parseLocation(data.locationAddress),
+      locationParsed: this.parseLocation(data.locationAddress),
       categories: data.categories || [],
       profileUrl: `https://www.every.org/${base.slug}`,
     };

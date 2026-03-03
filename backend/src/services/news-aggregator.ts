@@ -111,22 +111,18 @@ export class NewsAggregatorService {
     const errors: string[] = [];
     let totalLLMCalls = 0;
     let estimatedTokens = 0;
+    const targetArticles = options.limit || 20;
 
-    for (const config of configs) {
+    // OPTIMIZATION: Fetch from all sources in parallel instead of sequentially
+    const fetchPromises = configs.map(async (config) => {
       try {
         // Check rate limits
         if (!this.canFetch(config)) {
           console.log(`Rate limit reached for ${config.provider}, skipping...`);
-          continue;
+          return { articles: [], config, error: null };
         }
 
         const articles = await this.fetchFromSource(config, options);
-        allArticles.push(...articles);
-
-        // Track LLM usage (if any classification/processing happens)
-        // For now, we estimate based on articles fetched
-        totalLLMCalls += 1; // One call per source
-        estimatedTokens += articles.length * 100; // Rough estimate
 
         // Update usage stats and clear any previous errors on success
         await this.updateUsageStats(config);
@@ -136,17 +132,43 @@ export class NewsAggregatorService {
           config.lastError = undefined;
           await config.save();
         }
+
+        return { articles, config, error: null };
       } catch (error: any) {
         const errorMsg = `Error fetching from ${config.provider}: ${error.message}`;
         console.error(errorMsg);
-        errors.push(errorMsg);
         
         // Update last error with timestamp
         const timestamp = new Date().toISOString();
         config.lastError = `[${timestamp}] ${errorMsg}`;
         await config.save();
+
+        return { articles: [], config, error: errorMsg };
+      }
+    });
+
+    // OPTIMIZATION: Use Promise.allSettled to handle partial failures gracefully
+    // This ensures we get results even if some APIs fail
+    const results = await Promise.allSettled(fetchPromises);
+
+    // Collect articles and errors
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        const { articles, error } = result.value;
+        if (articles.length > 0) {
+          allArticles.push(...articles);
+          totalLLMCalls += 1;
+          estimatedTokens += articles.length * 100;
+        }
+        if (error) {
+          errors.push(error);
+        }
+      } else {
+        errors.push(`Promise rejected: ${result.reason}`);
       }
     }
+
+    console.log(`[NewsAggregator] Collected ${allArticles.length} articles from ${configs.length} sources`);
 
     // Remove duplicates by URL and title (more aggressive deduplication)
     const uniqueArticles = this.deduplicateArticles(allArticles);
@@ -257,7 +279,8 @@ export class NewsAggregatorService {
     const url = `https://newsapi.org/v2/everything?q=${encodeURIComponent(query)}&pageSize=${limit}&sortBy=publishedAt&language=en`;
     
     const response = await axios.get(url, {
-      headers: { 'X-Api-Key': config.apiKey }
+      headers: { 'X-Api-Key': config.apiKey },
+      timeout: 10000 // 10 second timeout
     });
 
     console.log(`[NewsAPI] Success: ${response.data.articles?.length || 0} articles`);
@@ -283,7 +306,7 @@ export class NewsAggregatorService {
       
       console.log(`[NewsData] Fetching with query: "${query}", limit: ${actualLimit}`);
       const response = await axios.get(url, {
-        timeout: 60000 // Increased to 60 second timeout
+        timeout: 10000 // 10 second timeout
       });
       console.log(`[NewsData] Success: ${response.data.results?.length || 0} articles`);
       return response.data.results || [];
@@ -335,7 +358,7 @@ export class NewsAggregatorService {
           page_size: actualLimit
         },
         headers: { 'Authorization': config.apiKey },
-        timeout: 60000 // 60 seconds for search
+        timeout: 10000 // 10 second timeout
       });
 
       console.log(`[Currents] Success: ${response.data.news?.length || 0} articles for query "${query}"`);
@@ -379,7 +402,9 @@ export class NewsAggregatorService {
     
     const url = `https://content.guardianapis.com/search?q=${encodeURIComponent(query)}&page-size=${limit}&show-fields=all&api-key=${config.apiKey}`;
     
-    const response = await axios.get(url);
+    const response = await axios.get(url, {
+      timeout: 10000 // 10 second timeout
+    });
     console.log(`[Guardian] Success: ${response.data.response?.results?.length || 0} articles`);
     return response.data.response?.results || [];
   }
@@ -399,7 +424,9 @@ export class NewsAggregatorService {
     
     const url = `http://api.mediastack.com/v1/news?access_key=${config.apiKey}&keywords=${encodeURIComponent(query)}${countryParam}&languages=en&limit=${limit}`;
     
-    const response = await axios.get(url);
+    const response = await axios.get(url, {
+      timeout: 10000 // 10 second timeout
+    });
     console.log(`[MediaStack] Success: ${response.data.data?.length || 0} articles`);
     return response.data.data || [];
   }
@@ -418,7 +445,9 @@ export class NewsAggregatorService {
     
     const url = `https://gnews.io/api/v4/search?q=${encodeURIComponent(query)}&lang=en&max=${limit}&apikey=${config.apiKey}`;
     
-    const response = await axios.get(url);
+    const response = await axios.get(url, {
+      timeout: 10000 // 10 second timeout
+    });
     console.log(`[GNews] Success: ${response.data.articles?.length || 0} articles`);
     return response.data.articles || [];
   }

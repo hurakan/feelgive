@@ -17,6 +17,7 @@ import organizationsRouter from './routes/organizations.js';
 import newsRouter from './routes/news.js';
 import recommendationsRouter from './routes/recommendations.js';
 import analyticsRouter from './routes/analytics.js';
+import enrichmentRouter from './routes/enrichment.js';
 
 // Load environment variables
 dotenv.config();
@@ -121,6 +122,7 @@ app.use(`/api/${API_VERSION}/organizations`, organizationsRouter);
 app.use(`/api/${API_VERSION}/news`, newsRouter);
 app.use(`/api/${API_VERSION}/recommendations`, recommendationsRouter);
 app.use(`/api/${API_VERSION}/analytics`, analyticsRouter);
+app.use(`/api/${API_VERSION}/enrichment`, enrichmentRouter);
 
 /**
  * @swagger
@@ -173,6 +175,7 @@ app.get('/', (_req, res) => {
       news: `/api/${API_VERSION}/news`,
       recommendations: `/api/${API_VERSION}/recommendations`,
       analytics: `/api/${API_VERSION}/analytics`,
+      enrichment: `/api/${API_VERSION}/enrichment`,
     },
   });
 });

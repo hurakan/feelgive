@@ -274,6 +274,11 @@ export class Reranker {
       if (this.isLegalNameOnly(candidate.name)) {
         return false;
       }
+
+      // Penalize suspicious/generic name patterns
+      if (this.hasSuspiciousNamePattern(candidate.name)) {
+        return false;
+      }
     }
 
     return true;
@@ -287,6 +292,19 @@ export class Reranker {
     const allCaps = name === name.toUpperCase();
     
     return allCaps && legalSuffixes.test(name);
+  }
+
+  /**
+   * Check for suspicious or generic name patterns
+   */
+  private hasSuspiciousNamePattern(name: string): boolean {
+    const suspiciousPatterns = [
+      /^[A-Z\s]+$/,  // All caps (e.g., "GENERIC CHARITY")
+      /\b(FUND|FOUNDATION|TRUST|CHARITY)\s*\d+$/i,  // Generic with numbers (e.g., "FUND 123")
+      /^(THE\s+)?[A-Z\s]+(FUND|FOUNDATION|TRUST)$/i,  // Very generic (e.g., "THE CHARITY FUND")
+    ];
+
+    return suspiciousPatterns.some(pattern => pattern.test(name));
   }
 
   /**
@@ -418,6 +436,7 @@ export class Reranker {
 
   /**
    * Calculate total score (weighted by policy priority)
+   * Updated weights: geo 45%, cause 40%, trust 15%
    */
   private calculateTotalScore(scores: {
     geo: number;
@@ -425,13 +444,75 @@ export class Reranker {
     trust: number;
     quality: number;
   }): number {
-    // Weights reflect policy priority
-    return (
-      scores.geo * 0.40 +      // 40% - PRIMARY
-      scores.cause * 0.35 +    // 35% - SECONDARY
-      scores.trust * 0.15 +    // 15% - TIEBREAKER
-      scores.quality * 0.10    // 10% - SUPPORTING
+    // Base score with updated weights
+    let total = (
+      scores.geo * 0.45 +      // 45% - PRIMARY (increased from 40%)
+      scores.cause * 0.40 +    // 40% - SECONDARY (increased from 35%)
+      scores.trust * 0.15      // 15% - TIEBREAKER (unchanged)
     );
+
+    // Quality is now used for penalties rather than positive weight
+    // Apply penalties based on quality issues
+    const penalties = this.calculatePenalties(scores.quality);
+    total = Math.max(0, total - penalties);
+
+    return total;
+  }
+
+  /**
+   * Calculate penalties for quality issues
+   * Returns penalty points to subtract from total score
+   */
+  private calculatePenalties(qualityScore: number): number {
+    let penalties = 0;
+
+    // Missing website + description: -30 points (0.3 * 100)
+    if (qualityScore < 60) {
+      penalties += 30;
+    }
+
+    // Very low quality (missing most metadata): additional -20 points
+    if (qualityScore < 40) {
+      penalties += 20;
+    }
+
+    return penalties;
+  }
+
+  /**
+   * Check if organization might be a duplicate/umbrella entry
+   * This is used during deduplication in the diversity rule
+   */
+  private isDuplicateUmbrellaEntry(org: NonprofitRanked, existing: NonprofitRanked[]): boolean {
+    const orgName = org.name.toLowerCase();
+    
+    for (const existingOrg of existing) {
+      const existingName = existingOrg.name.toLowerCase();
+      
+      // Check for umbrella patterns (e.g., "Red Cross" vs "American Red Cross")
+      if (orgName.includes(existingName) || existingName.includes(orgName)) {
+        // If names are very similar, consider it a duplicate
+        const similarity = this.calculateNameSimilarity(orgName, existingName);
+        if (similarity > 0.8) {
+          return true;
+        }
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Calculate name similarity (simple Jaccard similarity on words)
+   */
+  private calculateNameSimilarity(name1: string, name2: string): number {
+    const words1 = new Set(name1.split(/\s+/).filter(w => w.length > 2));
+    const words2 = new Set(name2.split(/\s+/).filter(w => w.length > 2));
+    
+    const intersection = new Set([...words1].filter(w => words2.has(w)));
+    const union = new Set([...words1, ...words2]);
+    
+    return union.size > 0 ? intersection.size / union.size : 0;
   }
 
   /**

@@ -49,7 +49,8 @@ export function CharityCard({ charity, onDonate, featured = false, isSelected = 
 
   return (
     <>
-      <Card 
+      <Card
+        data-testid="charity-card"
         className={`w-full transition-all duration-300 hover:shadow-xl hover:scale-[1.01] ${
           featured ? `border-2 shadow-lg bg-gradient-to-br ${getTrustColor(charity.trustScore)}` : 'border'
         } ${

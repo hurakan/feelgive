@@ -6,6 +6,7 @@ import crypto from 'crypto';
 interface CacheEntry<T> {
   data: T;
   expiresAt: number;
+  createdAt: number;
 }
 
 /**
@@ -19,6 +20,24 @@ export interface CacheStats {
 }
 
 /**
+ * Cache TTL configuration (in seconds)
+ */
+export interface CacheTTLConfig {
+  queryResults: number;    // 7-30 days
+  orgDetails: number;      // 30-90 days
+  breakingNews: number;    // Shorter TTL for recent news (< 72 hours)
+}
+
+/**
+ * Default TTL configuration
+ */
+const DEFAULT_TTL_CONFIG: CacheTTLConfig = {
+  queryResults: 7 * 24 * 60 * 60,      // 7 days
+  orgDetails: 30 * 24 * 60 * 60,       // 30 days
+  breakingNews: 6 * 60 * 60,           // 6 hours
+};
+
+/**
  * In-memory cache with TTL support
  * Can be extended to use Redis for distributed caching
  */
@@ -29,18 +48,45 @@ export class RecommendationCache {
   private maxSize: number = 1000;
 
   // TTLs in milliseconds
+  private ttlConfig: CacheTTLConfig;
   private ttls = {
     search: 6 * 60 * 60 * 1000,      // 6 hours
     browse: 6 * 60 * 60 * 1000,      // 6 hours
     nonprofit: 24 * 60 * 60 * 1000,  // 24 hours
     recommendation: 1 * 60 * 60 * 1000, // 1 hour
+    queryResults: 7 * 24 * 60 * 60 * 1000,  // 7 days
+    orgDetails: 30 * 24 * 60 * 60 * 1000,   // 30 days
+    breakingNews: 6 * 60 * 60 * 1000,       // 6 hours
   };
 
-  constructor() {
+  constructor(ttlConfig?: Partial<CacheTTLConfig>) {
     this.cache = new Map();
+    this.ttlConfig = { ...DEFAULT_TTL_CONFIG, ...ttlConfig };
+    
+    // Update TTLs from config (convert seconds to milliseconds)
+    this.ttls.queryResults = this.ttlConfig.queryResults * 1000;
+    this.ttls.orgDetails = this.ttlConfig.orgDetails * 1000;
+    this.ttls.breakingNews = this.ttlConfig.breakingNews * 1000;
     
     // Clean up expired entries every 5 minutes
     setInterval(() => this.cleanup(), 5 * 60 * 1000);
+  }
+
+  /**
+   * Update TTL configuration
+   */
+  updateTTLConfig(config: Partial<CacheTTLConfig>): void {
+    this.ttlConfig = { ...this.ttlConfig, ...config };
+    this.ttls.queryResults = this.ttlConfig.queryResults * 1000;
+    this.ttls.orgDetails = this.ttlConfig.orgDetails * 1000;
+    this.ttls.breakingNews = this.ttlConfig.breakingNews * 1000;
+  }
+
+  /**
+   * Get current TTL configuration
+   */
+  getTTLConfig(): CacheTTLConfig {
+    return { ...this.ttlConfig };
   }
 
   /**
@@ -71,12 +117,28 @@ export class RecommendationCache {
   getRecommendationKey(
     articleText: string,
     geography: any,
-    causes: string[]
+    causes: string[],
+    publishedAt?: string
   ): string {
     const textHash = this.hashString(articleText.substring(0, 500));
     const geoHash = this.hashObject(geography);
     const causesHash = this.hashArray(causes);
-    return `recommendation:${textHash}:${geoHash}:${causesHash}`;
+    
+    // Add timestamp indicator for breaking news detection
+    const isBreakingNews = publishedAt ? this.isBreakingNews(publishedAt) : false;
+    const prefix = isBreakingNews ? 'breaking' : 'recommendation';
+    
+    return `${prefix}:${textHash}:${geoHash}:${causesHash}`;
+  }
+
+  /**
+   * Check if article is breaking news (< 72 hours old)
+   */
+  private isBreakingNews(publishedAt: string): boolean {
+    const publishedTime = new Date(publishedAt).getTime();
+    const now = Date.now();
+    const hoursSincePublished = (now - publishedTime) / (1000 * 60 * 60);
+    return hoursSincePublished < 72;
   }
 
   /**
@@ -113,9 +175,11 @@ export class RecommendationCache {
       } else if (key.startsWith('browse:')) {
         ttl = this.ttls.browse;
       } else if (key.startsWith('nonprofit:')) {
-        ttl = this.ttls.nonprofit;
+        ttl = this.ttls.orgDetails; // Use configurable org details TTL
       } else if (key.startsWith('recommendation:')) {
-        ttl = this.ttls.recommendation;
+        ttl = this.ttls.queryResults; // Use configurable query results TTL
+      } else if (key.startsWith('breaking:')) {
+        ttl = this.ttls.breakingNews; // Shorter TTL for breaking news
       } else {
         ttl = this.ttls.search; // default
       }
@@ -129,9 +193,11 @@ export class RecommendationCache {
       }
     }
 
+    const now = Date.now();
     this.cache.set(key, {
       data: value,
-      expiresAt: Date.now() + ttl,
+      expiresAt: now + ttl,
+      createdAt: now,
     });
   }
 

@@ -1,0 +1,42 @@
+# FeelGive Backend Environment Variables for Render
+# Copy and paste these into Render Dashboard → Backend Service → Environment
+
+# Server Configuration
+NODE_ENV=production
+PORT=3001
+API_VERSION=v1
+
+# MongoDB Atlas Configuration
+MONGODB_URI=mongodb+srv://feelgive-admin:yWaxLLxg5Bfr06Fj@cluster0.l5wtoif.mongodb.net/feelgive?appName=Cluster0
+
+# JWT Configuration
+JWT_SECRET=feelgive-super-secret-jwt-key-change-in-production-min-32-chars
+
+# Admin Configuration
+ADMIN_KEY=dev-admin-key-12345
+ADMIN_EMAILS=feel2give@gmail.com
+
+# CORS Configuration
+# IMPORTANT: Update this after frontend is deployed
+FRONTEND_URL=https://feelgive-frontend.onrender.com
+
+# Rate Limiting
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX_REQUESTS=100
+
+# Every.org API Configuration
+EVERY_ORG_API_PUBLIC_KEY=pk_live_5f114aba289e827a13282e788ad886f0
+EVERY_ORG_DETAILS_URL=https://partners.every.org/v0.2/search/%7BsearchTerm%7D?apiKey=pk_live_5f114aba289e827a13282e788ad886f0
+DONATION_URL=staging.every.org
+REDIRECT_URL=https://feelgive-frontend.onrender.com/donation-success
+
+# Google Gemini API (for RAG Chat)
+GEMINI_API_KEY=AIzaSyAc6A0QOhIR5B0-eRCbcpYmCNuAA40Y6xM
+
+# News API Configuration
+NEWS_API_KEY=94cdacee01464753970ba107fd4864a7
+NEWSDATA_KEY=pub_453ad9f24d2f4b479294437fa5bfbc9e
+CURRENTS_KEY=W9-TGivjxWPC4SyNeiPLRIQXBcf_QpabV0Q_16tOqj2ia6_F
+GUARDIAN_KEY=780dc255-fb98-4941-956d-de59c3193255
+MEDIASTACK_KEY=931cf135c5de718e81cf0162a22875d7
+GNEWS_KEY=9ceab55316e2249553dea17ae19100c5

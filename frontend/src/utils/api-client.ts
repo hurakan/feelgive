@@ -189,6 +189,30 @@ class ApiClient {
     return this.request(`/organizations/${encodeURIComponent(slug)}`);
   }
 
+  // Recommendation endpoint (geo-relevant)
+  async getRecommendations(context: {
+    title: string;
+    description?: string;
+    content?: string;
+    url?: string;
+    entities: {
+      geography: {
+        country?: string;
+        region?: string;
+        city?: string;
+      };
+      disasterType?: string;
+      affectedGroup?: string;
+    };
+    causes: string[];
+    keywords: string[];
+  }) {
+    return this.request('/recommendations', {
+      method: 'POST',
+      body: JSON.stringify(context),
+    });
+  }
+
   // Health check
   async healthCheck() {
     try {

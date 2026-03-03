@@ -1,0 +1,282 @@
+[
+  {
+    "id": "ca-wildfire-2024-01",
+    "name": "California Wildfire - Los Angeles",
+    "signals": {
+      "articleId": "ca-wildfire-2024-01",
+      "headline": "Massive Wildfire Forces Evacuations in Los Angeles County",
+      "summary": "A fast-moving wildfire has forced thousands of residents to evacuate in Southern California as firefighters battle extreme conditions.",
+      "geo": {
+        "country": "United States",
+        "admin1": "California",
+        "city": "Los Angeles"
+      },
+      "causeTags": ["disaster-relief", "emergency-response", "wildfire", "evacuation"],
+      "eventType": "wildfire",
+      "publishedAt": "2024-01-15T10:00:00Z"
+    },
+    "expected": {
+      "minResults": 5,
+      "geoRequirements": {
+        "exactAdmin1Count": 2,
+        "exactCountryCount": 3,
+        "noMismatch": true
+      },
+      "qualityRequirements": {
+        "minWithWebsite": 4,
+        "minWithDescription": 4
+      }
+    }
+  },
+  {
+    "id": "turkey-earthquake-2024",
+    "name": "Turkey Earthquake",
+    "signals": {
+      "articleId": "turkey-earthquake-2024",
+      "headline": "Devastating 7.8 Magnitude Earthquake Strikes Southern Turkey",
+      "summary": "A powerful earthquake has caused widespread destruction across Turkey and neighboring Syria, with thousands feared dead.",
+      "geo": {
+        "country": "Turkey",
+        "admin1": "Hatay"
+      },
+      "causeTags": ["disaster-relief", "emergency-response", "earthquake", "humanitarian-aid"],
+      "eventType": "earthquake",
+      "publishedAt": "2024-02-06T04:17:00Z"
+    },
+    "expected": {
+      "minResults": 5,
+      "geoRequirements": {
+        "exactCountryCount": 2,
+        "regionalCount": 2,
+        "noMismatch": true
+      },
+      "qualityRequirements": {
+        "minWithWebsite": 3,
+        "minWithDescription": 4
+      }
+    }
+  },
+  {
+    "id": "florida-hurricane-2024",
+    "name": "Florida Hurricane",
+    "signals": {
+      "articleId": "florida-hurricane-2024",
+      "headline": "Category 4 Hurricane Makes Landfall in Florida",
+      "summary": "Hurricane strikes Florida coast with devastating winds and storm surge, causing widespread damage.",
+      "geo": {
+        "country": "United States",
+        "admin1": "Florida",
+        "city": "Tampa"
+      },
+      "causeTags": ["disaster-relief", "emergency-response", "hurricane", "flooding"],
+      "eventType": "hurricane",
+      "publishedAt": "2024-09-28T14:00:00Z"
+    },
+    "expected": {
+      "minResults": 5,
+      "geoRequirements": {
+        "exactAdmin1Count": 2,
+        "exactCountryCount": 3,
+        "noMismatch": true
+      },
+      "qualityRequirements": {
+        "minWithWebsite": 4,
+        "minWithDescription": 4
+      }
+    }
+  },
+  {
+    "id": "bangladesh-flood-2024",
+    "name": "Bangladesh Flooding",
+    "signals": {
+      "articleId": "bangladesh-flood-2024",
+      "headline": "Severe Monsoon Flooding Displaces Millions in Bangladesh",
+      "summary": "Record monsoon rains have caused catastrophic flooding across Bangladesh, affecting millions of people.",
+      "geo": {
+        "country": "Bangladesh"
+      },
+      "causeTags": ["disaster-relief", "flooding", "humanitarian-aid", "displaced-persons"],
+      "eventType": "flood",
+      "publishedAt": "2024-07-20T08:00:00Z"
+    },
+    "expected": {
+      "minResults": 5,
+      "geoRequirements": {
+        "exactCountryCount": 2,
+        "regionalCount": 2,
+        "globalAllowed": true
+      },
+      "qualityRequirements": {
+        "minWithWebsite": 3,
+        "minWithDescription": 4
+      }
+    }
+  },
+  {
+    "id": "syria-conflict-2024",
+    "name": "Syria Humanitarian Crisis",
+    "signals": {
+      "articleId": "syria-conflict-2024",
+      "headline": "Humanitarian Crisis Deepens in Northern Syria",
+      "summary": "Ongoing conflict has created a severe humanitarian crisis with millions in need of assistance.",
+      "geo": {
+        "country": "Syria",
+        "admin1": "Aleppo"
+      },
+      "causeTags": ["humanitarian-aid", "conflict", "refugees", "food-security"],
+      "eventType": "conflict",
+      "publishedAt": "2024-03-10T12:00:00Z"
+    },
+    "expected": {
+      "minResults": 5,
+      "geoRequirements": {
+        "exactCountryCount": 1,
+        "regionalCount": 3,
+        "globalAllowed": true
+      },
+      "qualityRequirements": {
+        "minWithWebsite": 3,
+        "minWithDescription": 4
+      }
+    }
+  },
+  {
+    "id": "kenya-drought-2024",
+    "name": "Kenya Drought",
+    "signals": {
+      "articleId": "kenya-drought-2024",
+      "headline": "Severe Drought Threatens Food Security in Kenya",
+      "summary": "Extended drought conditions have left millions facing food insecurity across Kenya.",
+      "geo": {
+        "country": "Kenya"
+      },
+      "causeTags": ["humanitarian-aid", "drought", "food-security", "water-crisis"],
+      "eventType": "drought",
+      "publishedAt": "2024-05-15T09:00:00Z"
+    },
+    "expected": {
+      "minResults": 5,
+      "geoRequirements": {
+        "exactCountryCount": 1,
+        "regionalCount": 2,
+        "globalAllowed": true
+      },
+      "qualityRequirements": {
+        "minWithWebsite": 3,
+        "minWithDescription": 4
+      }
+    }
+  },
+  {
+    "id": "japan-earthquake-2024",
+    "name": "Japan Earthquake",
+    "signals": {
+      "articleId": "japan-earthquake-2024",
+      "headline": "Major Earthquake Strikes Western Japan",
+      "summary": "A 7.5 magnitude earthquake has struck western Japan, causing significant damage and casualties.",
+      "geo": {
+        "country": "Japan",
+        "admin1": "Ishikawa"
+      },
+      "causeTags": ["disaster-relief", "earthquake", "emergency-response"],
+      "eventType": "earthquake",
+      "publishedAt": "2024-01-01T07:10:00Z"
+    },
+    "expected": {
+      "minResults": 5,
+      "geoRequirements": {
+        "exactCountryCount": 2,
+        "regionalCount": 2,
+        "globalAllowed": true
+      },
+      "qualityRequirements": {
+        "minWithWebsite": 4,
+        "minWithDescription": 4
+      }
+    }
+  },
+  {
+    "id": "morocco-earthquake-2024",
+    "name": "Morocco Earthquake",
+    "signals": {
+      "articleId": "morocco-earthquake-2024",
+      "headline": "Deadly Earthquake Strikes Morocco's Atlas Mountains",
+      "summary": "A powerful earthquake has devastated remote mountain villages in Morocco.",
+      "geo": {
+        "country": "Morocco",
+        "admin1": "Marrakesh-Safi"
+      },
+      "causeTags": ["disaster-relief", "earthquake", "emergency-response", "humanitarian-aid"],
+      "eventType": "earthquake",
+      "publishedAt": "2024-09-08T23:11:00Z"
+    },
+    "expected": {
+      "minResults": 5,
+      "geoRequirements": {
+        "exactCountryCount": 1,
+        "regionalCount": 2,
+        "globalAllowed": true
+      },
+      "qualityRequirements": {
+        "minWithWebsite": 3,
+        "minWithDescription": 4
+      }
+    }
+  },
+  {
+    "id": "texas-winter-storm-2024",
+    "name": "Texas Winter Storm",
+    "signals": {
+      "articleId": "texas-winter-storm-2024",
+      "headline": "Severe Winter Storm Paralyzes Texas",
+      "summary": "Unprecedented winter storm brings freezing temperatures and power outages across Texas.",
+      "geo": {
+        "country": "United States",
+        "admin1": "Texas",
+        "city": "Houston"
+      },
+      "causeTags": ["disaster-relief", "emergency-response", "winter-storm", "power-outage"],
+      "eventType": "winter storm",
+      "publishedAt": "2024-01-16T06:00:00Z"
+    },
+    "expected": {
+      "minResults": 5,
+      "geoRequirements": {
+        "exactAdmin1Count": 2,
+        "exactCountryCount": 3,
+        "noMismatch": true
+      },
+      "qualityRequirements": {
+        "minWithWebsite": 4,
+        "minWithDescription": 4
+      }
+    }
+  },
+  {
+    "id": "ukraine-conflict-2024",
+    "name": "Ukraine Humanitarian Crisis",
+    "signals": {
+      "articleId": "ukraine-conflict-2024",
+      "headline": "Ongoing Conflict Creates Humanitarian Emergency in Ukraine",
+      "summary": "Millions of Ukrainians continue to face displacement and humanitarian needs.",
+      "geo": {
+        "country": "Ukraine"
+      },
+      "causeTags": ["humanitarian-aid", "conflict", "refugees", "displaced-persons"],
+      "eventType": "conflict",
+      "publishedAt": "2024-04-20T10:00:00Z"
+    },
+    "expected": {
+      "minResults": 5,
+      "geoRequirements": {
+        "exactCountryCount": 1,
+        "regionalCount": 3,
+        "globalAllowed": true
+      },
+      "qualityRequirements": {
+        "minWithWebsite": 3,
+        "minWithDescription": 4
+      }
+    }
+  }
+]

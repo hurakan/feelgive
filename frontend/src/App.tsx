@@ -10,6 +10,7 @@ import TestClassification from "./pages/test-classification";
 import DonationSuccess from "./pages/donation-success";
 import AdminNewsPage from "./pages/admin-news";
 import AdminAnalytics from "./pages/admin-analytics";
+import AdminEnrichment from "./pages/admin-enrichment";
 import NotFound from "./pages/NotFound";
 import analyticsTracker from "@/utils/analytics-tracker";
 
@@ -60,6 +61,7 @@ const App = () => (
             <Route path="/donation-success" element={<DonationSuccess />} />
             <Route path="/admin/news" element={<AdminNewsPage />} />
             <Route path="/admin/analytics" element={<AdminAnalytics />} />
+            <Route path="/admin/enrichment" element={<AdminEnrichment />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
